@@ -120,20 +120,20 @@ Pastikan:
             let text = response.text();
 
             // Parse JSON response (clean markdown code blocks if any)
-            text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim(); // menghapus ```json jika ada
             const itinerary = JSON.parse(text);
 
             // Response
             res.status(200).json({
-                message: 'Trip itinerary generated successfully',
+                message: 'Trip itinerary generated successfully', // untuk logging frontend
                 itinerary
             });
         } catch (error) {
             // Handle JSON parse error
             if (error instanceof SyntaxError) {
-                return next({
-                    name: 'ExternalAPIError',
-                    message: 'Failed to parse AI response. Please try again.'
+                return next({ 
+                    name: 'ExternalAPIError', // custom error untuk Gemini
+                    message: 'Failed to parse AI response. Please try again.' // untuk user
                 });
             }
             next(error);
@@ -149,10 +149,10 @@ Pastikan:
             console.log('Chatbot request received:', { userId: req.user?.id, message: req.body?.message });
             
             // Initialize Gemini AI inside method so mock works
-            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const { Op } = require('sequelize');
-            const userId = req.user.id;
-            const { message, conversationHistory = [] } = req.body;
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); // Gemini API Key from .env
+            const { Op } = require('sequelize'); // Import Op di dalam method
+            const userId = req.user.id; // Pastikan userId diambil dari req.user
+            const { message, conversationHistory = [] } = req.body; // Pesan dari user dan history percakapan
 
             // Validasi
             if (!message) {
@@ -166,10 +166,10 @@ Pastikan:
             let relevantPlaces = [];
             
             if (searchKeywords.length > 0) {
-                relevantPlaces = await Place.findAll({
+                relevantPlaces = await Place.findAll({ // Mencari places yang relevan dengan keywords
                     where: {
-                        [Op.or]: searchKeywords.map(keyword => ({
-                            [Op.or]: [
+                        [Op.or]: searchKeywords.map(keyword => ({ // gunakan array untuk multiple OR conditions
+                            [Op.or]: [ // cari di beberapa field
                                 { name: { [Op.iLike]: `%${keyword}%` } },
                                 { location: { [Op.iLike]: `%${keyword}%` } },
                                 { description: { [Op.iLike]: `%${keyword}%` } },
@@ -178,7 +178,7 @@ Pastikan:
                         }))
                     },
                     limit: 5,
-                    attributes: ['id', 'name', 'description', 'location', 'category', 'rating', 'imageUrl']
+                    attributes: ['id', 'name', 'description', 'location', 'category', 'rating', 'imageUrl'] // fields to return
                 });
             }
 
