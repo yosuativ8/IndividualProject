@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       // Place memiliki many-to-many relationship dengan User melalui UserDestinations
       // Many users can save many places (wishlist)
       Place.belongsToMany(models.User, { 
-        through: 'UserDestinations', 
+        through: models.UserDestination, 
         foreignKey: 'placeId',
         as: 'savedByUsers' 
       });

@@ -1,70 +1,82 @@
-//membuat tampilan utama aplikasi
-//dengan menggunakan routing untuk navigasi antar halaman
-//dan menampilkan loading serta error handling saat mengambil data tempat sebelum dipindahkan ke helper.
-// menggukan api PlaceAPI dan GeminiAPI untuk mengambil data tempat wisata.
-//menambahkan setiap comment pada setiap baris kode untuk menjelaskan fungsinya.
-//client menggunakan React untuk membuat tampilan frontend aplikasi.
-//register dan login user akan menggunakan google sign in nanti.
+// App Component - Main aplikasi dengan routing dan Redux Provider
+// Menggunakan React Router untuk navigasi antar halaman
+// Redux untuk state management global (auth, places, wishlist)
+// Bootstrap untuk styling
 
-import React, { useState, useEffect } from 'react';
-// import PlaceAPI from './api/PlaceAPI';
-// import GeminiAPI from './api/GeminiAPI';
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from './pages/Home';
-import PlaceDetails from './pages/PlaceDetails';
-import SearchResults from './pages/SearchResults';
-// import Navbar from './components/Navbar';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Provider, useSelector, useDispatch } from 'react-redux';
+import { useEffect } from 'react';
+import store from './store/store';
+import { fetchWishlist } from './store/slices/wishlistSlice';
 
-export default function App() {
-  const [places, setPlaces] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+// Import pages
+import Home from './Pages/Home';
+import Login from './Pages/Login';
+import Register from './Pages/Register';
+import PlaceDetails from './Pages/PlaceDetails';
+import SearchResults from './Pages/SearchResults';
+import Wishlist from './Pages/Wishlist';
 
+// Import components
+import Navbar from './component/Navbar';
+import ChatBot from './component/ChatBot';
+
+function AppContent() {
+  const location = useLocation();
+  const dispatch = useDispatch();
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  
+  // Hide navbar and chatbot on login and register pages
+  const hideNavbar = location.pathname === '/login' || location.pathname === '/register';
+  const hideChatBot = location.pathname === '/login' || location.pathname === '/register';
+
+  // Fetch wishlist on app load if user is authenticated
   useEffect(() => {
-    const fetchPlaces = async () => {
-      try {
-        setLoading(true);
-        // const placeData = await PlaceAPI.getPlaces();
-        // setPlaces(placeData);
-        setError(null);
-      } catch (error) {
-        console.error('Error fetching places:', error);
-        setError('Failed to load places. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPlaces();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading amazing places...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-red-500">{error}</div>
-      </div>
-    );
-  }
+    if (isAuthenticated) {
+      dispatch(fetchWishlist());
+    }
+  }, [isAuthenticated, dispatch]);
 
   return (
-    <BrowserRouter>
-      <div className="app">
-        {/* <Navbar /> */}
+    <div className="app">
+      {/* Navbar - Hidden on login and register pages */}
+      {!hideNavbar && <Navbar />}
+      
+      {/* Floating ChatBot - Only for authenticated users, hidden on login/register */}
+      {!hideChatBot && isAuthenticated && <ChatBot />}
+      
+      {/* Main Content - Routes */}
+      <main>
         <Routes>
-          <Route path="/" element={<Home places={places} />} />
-          <Route path="/place/:id" element={<PlaceDetails />} />
-          <Route path="/search" element={<SearchResults />} />
-          <Route path="*" element={<div>404 - Page Not Found</div>} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+          {/* Login/Register Pages */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+              {/* Home Page - Public */}
+              <Route path="/" element={<Home />} />
+              
+              {/* Place Details Page - Public */}
+              <Route path="/place/:id" element={<PlaceDetails />} />
+              
+              {/* Search Results Page - Public */}
+              <Route path="/search" element={<SearchResults />} />
+              
+              {/* Wishlist Page - Protected (tapi bisa diakses, cuma redirect ke login jika belum login) */}
+              <Route path="/wishlist" element={<Wishlist />} />
+              
+              {/* 404 Not Found */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Provider store={store}>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </Provider>
   );
 }

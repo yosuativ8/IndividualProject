@@ -23,12 +23,24 @@ module.exports = class AuthController {
             // membuat user baru di database
             const user = await User.create({ email, password });
             
-            // kembalikan response dengan status 201 dan data user (tanpa password)
+            // buat token JWT untuk user baru
+            const access_token = signToken({
+                id: user.id
+            });
+            
+            // kembalikan response dengan status 201, token, dan data user (tanpa password)
             res.status(201).json({
-                id: user.id,
-                email: user.email
+                access_token,
+                user: {
+                    id: user.id,
+                    email: user.email
+                }
             });
         } catch (error) {
+            // Handle unique constraint error for email
+            if (error.name === 'SequelizeUniqueConstraintError') {
+                return next({ name: 'BadRequest', message: 'Email is already registered' });
+            }
             next(error); // lempar error ke errorHandler middleware
         }
     }
@@ -42,7 +54,7 @@ module.exports = class AuthController {
             const { email, password } = req.body;
             if (!email || !password) { // validasi input
                 // lempar error BadRequest jika email atau password kosong
-                throw { name: 'BadRequest', message: 'Email or password are required' };
+                throw { name: 'BadRequest', message: 'Email and password are required' };
             }
             // cari user di database berdasarkan email
             const user = await User.findOne({
@@ -64,52 +76,138 @@ module.exports = class AuthController {
             const access_token = signToken({
                 id: user.id
             });
-            // kembalikan response dengan status 200 dan token JWT
-            res.status(200).json({ access_token });
+            // kembalikan response dengan status 200, token JWT, dan user email
+            res.status(200).json({ 
+                access_token,
+                user: {
+                    id: user.id,
+                    email: user.email
+                }
+            });
         } catch (error) {
             next(error); // lempar error ke errorHandler middleware
         }
     }
 
-    // method untuk Google Sign-In
-    // Endpoint: POST /auth/google-signin
+    // method untuk Google Register - Membuat akun baru dengan Google
+    // Endpoint: POST /auth/google-register
     // Access: Public
-    static async googleSignIn(req, res, next) {
+    static async googleRegister(req, res, next) {
         try {
-            const { id_token } = req.body; // ambil id_token dari request body
-            // verifikasi id_token menggunakan OAuth2Client
+            const { id_token } = req.body;
+            
+            // Verifikasi id_token menggunakan OAuth2Client
             const ticket = await client.verifyIdToken({
                 idToken: id_token,
                 audience: process.env.GOOGLE_CLIENT_ID
             });
-            const payload = ticket.getPayload(); // dapatkan payload dari ticket
-            const email = payload.email; // ambil email dari payload
-            // cari atau buat user di database berdasarkan email menggunakan findOrCreate untuk mencari atau membuat user baru
+            const payload = ticket.getPayload();
+            const email = payload.email;
+            
+            // Cek apakah email sudah terdaftar
+            const existingUser = await User.findOne({ where: { email } });
+            if (existingUser) {
+                throw { name: 'BadRequest', message: 'Email is already registered. Please login instead.' };
+            }
+            
+            // Buat user baru
+            const user = await User.create({
+                email,
+                password: 'google-oauth-no-password' // password dummy untuk Google user
+            });
+            
+            // Buat token JWT
+            const access_token = signToken({
+                id: user.id
+            });
+            
+            res.status(201).json({ 
+                access_token,
+                user: {
+                    id: user.id,
+                    email: user.email
+                },
+                message: 'Registration successful!'
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // method untuk Google Login - Hanya untuk user yang sudah register via Google
+    // Endpoint: POST /auth/google-login
+    // Access: Public
+    static async googleLogin(req, res, next) {
+        try {
+            const { id_token } = req.body;
+            
+            // Verifikasi id_token menggunakan OAuth2Client
+            const ticket = await client.verifyIdToken({
+                idToken: id_token,
+                audience: process.env.GOOGLE_CLIENT_ID
+            });
+            const payload = ticket.getPayload();
+            const email = payload.email;
+            
+            // Cari user di database
+            const user = await User.findOne({ where: { email } });
+            
+            if (!user) {
+                throw { name: 'Unauthorized', message: 'Account not found. Please register first.' };
+            }
+            
+            // Buat token JWT
+            const access_token = signToken({
+                id: user.id
+            });
+            
+            res.status(200).json({ 
+                access_token,
+                user: {
+                    id: user.id,
+                    email: user.email
+                }
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // method untuk Google Sign-In (backward compatibility)
+    // Endpoint: POST /auth/google-signin
+    // Access: Public
+    static async googleSignIn(req, res, next) {
+        try {
+            const { id_token } = req.body;
+            const ticket = await client.verifyIdToken({
+                idToken: id_token,
+                audience: process.env.GOOGLE_CLIENT_ID
+            });
+            const payload = ticket.getPayload();
+            const email = payload.email;
+            
             const [user, created] = await User.findOrCreate({
                 where: { email },
                 defaults: {
                     email,
-                    password: 'google-oauth-no-password' // password dummy untuk Google user
+                    password: 'google-oauth-no-password'
                 }
             });
 
-            // buat token JWT untuk user
             const access_token = signToken({
                 id: user.id
             });
-            // kembalikan response dengan status 200 dan token JWT
+            
             res.status(200).json({ 
                 access_token,
-                // data user yang berhasil login atau register via Google Sign-In
                 user: {
-                    id: user.id, // id user
-                    email: user.email // email user
+                    id: user.id,
+                    email: user.email
                 },
-                // menandakan apakah user baru dibuat atau sudah ada sebelumnya
                 isNewUser: created
             });
         } catch (error) {
-            next(error); // lempar error ke errorHandler middleware
+            next(error);
         }
     }
 }

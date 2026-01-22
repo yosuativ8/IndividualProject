@@ -1,0 +1,29 @@
+/* App.css - Minimal styles, most styling using Bootstrap */
+
+/* Smooth card hover effect */
+.hover-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Smooth image loading */
+.card-img-top {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease;
+}
+
+.hover-card:hover .card-img-top {
+  transform: scale(1.05);
+}
+
+/* Heart button animation */
+.btn i {
+  transition: transform 0.2s ease;
+}
+
+.btn:active i {
+  transform: scale(1.3);
+}

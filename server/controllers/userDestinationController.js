@@ -19,18 +19,15 @@ module.exports = class UserDestinationController {
                 include: [
                     {
                         model: Place, // Join dengan Place untuk mendapatkan detail destinasi
-                        as: 'place',
+                        as: 'place', // Use lowercase alias as defined in model
                         attributes: ['id', 'name', 'description', 'location', 'latitude', 'longitude', 'imageUrl', 'category', 'rating']
                     }
                 ],
                 order: [['createdAt', 'DESC']] // Urutkan dari yang baru ditambahkan
             });
 
-            // Kembalikan response
-            res.status(200).json({
-                totalSaved: wishlist.length,
-                wishlist
-            });
+            // Kembalikan response dalam array langsung untuk frontend
+            res.status(200).json(wishlist);
         } catch (error) {
             next(error);
         }
@@ -78,17 +75,14 @@ module.exports = class UserDestinationController {
                 include: [
                     {
                         model: Place,
-                        as: 'place',
+                        as: 'place', // Use lowercase alias
                         attributes: ['id', 'name', 'description', 'location', 'latitude', 'longitude', 'imageUrl', 'category', 'rating']
                     }
                 ]
             });
 
-            // Kembalikan response
-            res.status(201).json({
-                message: 'Place added to your wishlist',
-                data: result
-            });
+            // Kembalikan response langsung (bukan nested dalam data)
+            res.status(201).json(result);
         } catch (error) {
             next(error);
         }
