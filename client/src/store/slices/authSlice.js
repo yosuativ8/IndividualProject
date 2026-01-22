@@ -5,20 +5,20 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'; // Base URL API
 
 // Async thunk untuk register user baru
 export const register = createAsyncThunk(
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/register`, userData);
+      const response = await axios.post(`${API_URL}/auth/register`, userData); // Mengirim data register ke backend
       // Simpan token dan user ke localStorage
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      localStorage.setItem('token', response.data.access_token); // menyimpan token
+      localStorage.setItem('user', JSON.stringify(response.data.user)); // menyimpan data user
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+      return rejectWithValue(error.response?.data?.message || 'Registration failed'); // Menangani error
     }
   }
 );
@@ -28,11 +28,11 @@ export const login = createAsyncThunk(
   'auth/login',
   async (credentials, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, credentials);
+      const response = await axios.post(`${API_URL}/auth/login`, credentials); // Mengirim data login ke backend
       // Simpan token dan user ke localStorage
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      return response.data;
+      localStorage.setItem('token', response.data.access_token); // menyimpan token
+      localStorage.setItem('user', JSON.stringify(response.data.user)); // menyimpan data user
+      return response.data; // Mengembalikan data user dan token
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Login failed');
     }

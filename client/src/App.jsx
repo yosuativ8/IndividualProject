@@ -10,12 +10,12 @@ import store from './store/store';
 import { fetchWishlist } from './store/slices/wishlistSlice';
 
 // Import pages
-import Home from './Pages/Home';
-import Login from './Pages/Login';
-import Register from './Pages/Register';
-import PlaceDetails from './Pages/PlaceDetails';
-import SearchResults from './Pages/SearchResults';
-import Wishlist from './Pages/Wishlist';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import PlaceDetails from './pages/PlaceDetails';
+import SearchResults from './pages/SearchResults';
+import Wishlist from './pages/Wishlist';
 
 // Import components
 import Navbar from './component/Navbar';
