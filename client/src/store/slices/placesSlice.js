@@ -93,8 +93,11 @@ const initialState = {
   places: [],              // Daftar semua places
   currentPlace: null,      // Detail place yang sedang dilihat
   searchResults: [],       // Hasil pencarian
-  nearbyPlaces: [],        // Places terdekat
+  nearbyPlaces: JSON.parse(localStorage.getItem('lastSearchResults') || '[]'),  // Places terdekat (persist dari last search)
   aiRecommendation: null,  // Rekomendasi AI untuk place
+  mapCenter: JSON.parse(localStorage.getItem('lastMapCenter') || 'null'),         // Koordinat center map (persist dari last search)
+  showChatbotResults: false, // Flag untuk trigger tampilan hasil dari chatbot
+  filterQuery: '',         // Global filter query dari Navbar (untuk filter local cards)
   isLoading: false,
   error: null,
 };
@@ -116,6 +119,36 @@ const placesSlice = createSlice({
     // Action untuk clear search results
     clearSearchResults: (state) => {
       state.searchResults = [];
+    },
+    // Action untuk set places dari chatbot dan update map center
+    setPlacesFromChatbot: (state, action) => {
+      const { places, mapCenter } = action.payload;
+      state.nearbyPlaces = places || [];
+      state.mapCenter = mapCenter || null;
+      state.showChatbotResults = true; // Set flag untuk trigger Home.jsx
+      
+      // Persist to localStorage so results remain after navigation
+      localStorage.setItem('lastSearchResults', JSON.stringify(places || []));
+      localStorage.setItem('lastMapCenter', JSON.stringify(mapCenter || null));
+    },
+    // Action untuk set map center
+    setMapCenter: (state, action) => {
+      state.mapCenter = action.payload;
+    },
+    // Action untuk reset chatbot results flag
+    resetChatbotResults: (state) => {
+      state.showChatbotResults = false;
+    },
+    // Action untuk clear nearby places (clear last search)
+    clearNearbyPlaces: (state) => {
+      state.nearbyPlaces = [];
+      state.mapCenter = null;
+      localStorage.removeItem('lastSearchResults');
+      localStorage.removeItem('lastMapCenter');
+    },
+    // Action untuk set filter query dari Navbar
+    setFilterQuery: (state, action) => {
+      state.filterQuery = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -188,5 +221,5 @@ const placesSlice = createSlice({
   },
 });
 
-export const { clearError, clearCurrentPlace, clearSearchResults } = placesSlice.actions;
+export const { clearError, clearCurrentPlace, clearSearchResults, setPlacesFromChatbot, setMapCenter, resetChatbotResults, clearNearbyPlaces, setFilterQuery } = placesSlice.actions;
 export default placesSlice.reducer;

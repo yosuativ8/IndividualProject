@@ -13,6 +13,11 @@ const PlaceController = require('../controllers/placeController');
 // Query params: ?category=Pantai&search=Bali
 router.get('/', PlaceController.getAllPlaces);
 
+// GET /places/search - Search places by name or location
+// Query params: ?q=bali
+// Endpoint ini harus di atas /:id karena 'search' bisa dikira sebagai id
+router.get('/search', PlaceController.searchPlaces);
+
 // GET /places/nearby - Mencari places berdasarkan koordinat dalam radius tertentu
 // Query params: ?lat=-6.2088&lng=106.8456&radius=10
 // Endpoint ini harus di atas /:id karena 'nearby' bisa dikira sebagai id

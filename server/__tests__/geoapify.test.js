@@ -358,7 +358,7 @@ describe('Geoapify Controller', () => {
       const response = await request(app).get('/geoapify/autocomplete');
 
       expect(response.status).toBe(400);
-      expect(response.body.message).toContain('required');
+      expect(response.body.message).toContain('2 characters');
     });
 
     it('should return 400 if text is too short', async () => {

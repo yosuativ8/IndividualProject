@@ -18,12 +18,12 @@ export const fetchWishlist = createAsyncThunk(
   'wishlist/fetchWishlist',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token'); // Cek token untuk memastikan user terautentikasi
       if (!token) {
         return [];
       }
-      const response = await axios.get(`${API_URL}/wishlist`, {
-        headers: getAuthHeader()
+      const response = await axios.get(`${API_URL}/wishlist`, { // Fetch wishlist dari backend
+        headers: getAuthHeader() // Sertakan header Authorization dengan token
       });
       console.log('Wishlist fetched:', response.data);
       return response.data;
@@ -60,7 +60,7 @@ export const removeFromWishlist = createAsyncThunk(
   async (destinationId, { rejectWithValue }) => {
     try {
       await axios.delete(`${API_URL}/wishlist/${destinationId}`, {
-        headers: getAuthHeader()
+        headers: getAuthHeader() // Sertakan header Authorization dengan token
       });
       return destinationId;
     } catch (error) {

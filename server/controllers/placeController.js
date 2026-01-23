@@ -269,4 +269,44 @@ module.exports = class PlaceController {
             next(error);
         }
     }
+
+    // Method untuk search places by name or location
+    // Endpoint: GET /places/search?q=query
+    // Access: Public (tidak perlu login)
+    static async searchPlaces(req, res, next) {
+        try {
+            const { q } = req.query; // Get search query from query params
+
+            if (!q || q.trim().length === 0) {
+                throw { name: 'BadRequest', message: 'Search query is required' };
+            }
+
+            const searchTerm = q.trim();
+
+            // Search in name, location, description, and category
+            const places = await Place.findAll({
+                where: {
+                    [Op.or]: [
+                        { name: { [Op.iLike]: `%${searchTerm}%` } },
+                        { location: { [Op.iLike]: `%${searchTerm}%` } },
+                        { description: { [Op.iLike]: `%${searchTerm}%` } },
+                        { category: { [Op.iLike]: `%${searchTerm}%` } }
+                    ]
+                },
+                order: [
+                    ['rating', 'DESC'],
+                    ['createdAt', 'DESC']
+                ],
+                limit: 20 // Limit to 20 results
+            });
+
+            res.status(200).json({
+                query: searchTerm,
+                count: places.length,
+                places: places
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 };

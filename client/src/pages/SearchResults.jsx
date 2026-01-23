@@ -1,27 +1,36 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import PlaceCard from '../component/PlaceCard';
 
 export default function SearchResults() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { searchResults, isLoading, error } = useSelector((state) => state.places);
   
-  // Ambil search query dari location state (passed dari Navbar search)
+  // Ambil search query dan results dari location state (passed dari SearchBar)
   const searchQuery = location.state?.query || '';
+  const passedResults = location.state?.results || [];
+  const passedError = location.state?.error || null;
+  
+  const [results, setResults] = useState(passedResults);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(passedError);
 
   /**
-   * useEffect untuk redirect ke home jika:
-   * - Tidak ada search query DAN
-   * - Tidak ada search results
-   * Mencegah user akses halaman search tanpa melakukan search
+   * useEffect untuk update state ketika location.state berubah (second search, third search, etc)
    */
   useEffect(() => {
-    if (!searchQuery && searchResults.length === 0) {
+    setResults(passedResults);
+    setError(passedError);
+  }, [passedResults, passedError, location.key]);
+
+  /**
+   * useEffect untuk redirect ke home jika tidak ada query dan results
+   */
+  useEffect(() => {
+    if (!searchQuery && results.length === 0) {
       navigate('/');
     }
-  }, [searchQuery, searchResults, navigate]);
+  }, [searchQuery, results, navigate]);
 
   return (
     <div className="container py-4">
@@ -41,16 +50,16 @@ export default function SearchResults() {
       )}
 
       {error && !isLoading && (
-        <div className="alert alert-danger" role="alert">
-          {error}
+        <div className="alert alert-warning" role="alert">
+          <i className="bi bi-exclamation-triangle"></i> {error}
         </div>
       )}
 
-      {!isLoading && !error && (
+      {!isLoading && (
         <>
-          {searchResults.length > 0 ? (
+          {results.length > 0 ? (
             <div className="row g-4">
-              {searchResults.map((place, index) => (
+              {results.map((place, index) => (
                 <div key={place.id || index} className="col-md-6 col-lg-4">
                   <PlaceCard place={place} />
                 </div>
@@ -59,8 +68,9 @@ export default function SearchResults() {
           ) : (
             <div className="text-center py-5">
               <div className="display-1 mb-3"><i className="bi bi-search"></i></div>
-              <h3>No places found</h3>
-              <p className="text-muted">Try searching with a different location</p>
+              <h3>No places found for "{searchQuery}"</h3>
+              <p className="text-muted">Try searching with different keywords</p>
+              <p className="text-muted">Examples: "Borobudur", "Bali", "pantai", "gunung"</p>
             </div>
           )}
         </>

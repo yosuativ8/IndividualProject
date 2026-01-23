@@ -56,3 +56,10 @@ afterAll(async () => {
 
 process.env.GEOAPIFY_API_KEY = 'test-geoapify-api-key';
 process.env.GEMINI_API_KEY = 'test-gemini-api-key';
+
+// Dummy test to prevent Jest error
+describe('Setup', () => {
+  it('should setup test environment', () => {
+    expect(process.env.NODE_ENV).toBe('test');
+  });
+});

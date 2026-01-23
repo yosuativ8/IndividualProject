@@ -133,8 +133,9 @@ describe('Gemini Controller', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('tripTitle');
+      expect(response.body).toHaveProperty('message');
       expect(response.body).toHaveProperty('itinerary');
+      expect(response.body.itinerary).toHaveProperty('tripTitle');
       expect(mockGenerateContent).toHaveBeenCalled();
     });
 
@@ -178,9 +179,9 @@ describe('Gemini Controller', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('reply');
-      expect(response.body).toHaveProperty('message', 'Chat response generated');
-      expect(typeof response.body.reply).toBe('string');
+      expect(response.body).toHaveProperty('response');
+      expect(response.body).toHaveProperty('conversationId');
+      expect(typeof response.body.response).toBe('string');
       expect(mockGenerateContent).toHaveBeenCalled();
     });
 
@@ -213,12 +214,14 @@ describe('Gemini Controller', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('reply');
+      expect(response.body).toHaveProperty('response');
       expect(response.body).toHaveProperty('conversationId');
     });
 
     it('should handle Gemini API errors', async () => {
-      mockGenerateContent.mockRejectedValue(new Error('API Error'));
+      // Mock API key error
+      const apiError = new Error('API key not valid');
+      mockGenerateContent.mockRejectedValue(apiError);
 
       const response = await request(app)
         .post('/gemini/chat')
@@ -227,7 +230,11 @@ describe('Gemini Controller', () => {
           message: 'Hello'
         });
 
-      expect(response.status).toBeGreaterThanOrEqual(400);
+      // Gemini error caught internally and returns 200 with fallback message
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('response');
+      // For greetings, it should return welcome message
+      expect(response.body.response).toContain('Halo');
     });
   });
 

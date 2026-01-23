@@ -1,5 +1,8 @@
 // Test untuk helpers (bcrypt, jwt)
 
+// Set JWT_SECRET before importing helpers
+process.env.JWT_SECRET = 'test-jwt-secret-for-helpers-test';
+
 const bcrypt = require('../helpers/bcrypt');
 const jwt = require('../helpers/jwt');
 
@@ -112,8 +115,8 @@ describe('Helper Tests', () => {
 
       it('should create different tokens for same payload at different times', async () => {
         const token1 = jwt.signToken(payload);
-        // Wait 1ms to ensure different iat timestamp
-        await new Promise(resolve => setTimeout(resolve, 1));
+        // Wait 1 second to ensure different iat timestamp
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const token2 = jwt.signToken(payload);
 
         // Tokens should be different because of 'iat' (issued at) claim

@@ -9,6 +9,7 @@ export default function Wishlist() {
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
   const { items, isLoading, error } = useSelector((state) => state.wishlist);
+  const { filterQuery } = useSelector((state) => state.places); // Get filter from Navbar
 
   /**
    * useEffect untuk:
@@ -31,6 +32,25 @@ export default function Wishlist() {
   const handleRetry = () => {
     dispatch(fetchWishlist());
   };
+  
+  /**
+   * Filter items berdasarkan search query dari Navbar (case-insensitive)
+   * Search di name, location, description, category
+   */
+  const filteredItems = items.filter((item) => {
+    if (!filterQuery.trim()) return true;
+    
+    const place = item.place || item.Place;
+    if (!place) return false;
+    
+    const query = filterQuery.toLowerCase();
+    return (
+      place.name?.toLowerCase().includes(query) ||
+      place.location?.toLowerCase().includes(query) ||
+      place.description?.toLowerCase().includes(query) ||
+      place.category?.toLowerCase().includes(query)
+    );
+  });
 
   if (!isAuthenticated) {
     return null;
@@ -41,6 +61,13 @@ export default function Wishlist() {
       <div className="mb-4">
         <h1 className="h2"><i className="bi bi-heart-fill text-danger"></i> My Wishlist</h1>
         <p className="text-muted">Your saved destinations for future adventures</p>
+        
+        {/* Show filter indicator */}
+        {filterQuery && !isLoading && items.length > 0 && (
+          <div className="alert alert-info mt-3">
+            <i className="bi bi-funnel-fill"></i> Found {filteredItems.length} of {items.length} destinations matching "{filterQuery}"
+          </div>
+        )}
       </div>
 
       {isLoading && (
@@ -63,15 +90,23 @@ export default function Wishlist() {
 
       {!isLoading && !error && (
         <>
-          {items.length > 0 ? (
+          {filteredItems.length > 0 ? (
             <div className="row g-4">
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <div key={item.id} className="col-md-6 col-lg-4">
                   <PlaceCard place={item.place || item.Place} />
                 </div>
               ))}
             </div>
+          ) : filterQuery ? (
+            // No results from Navbar filter
+            <div className="text-center py-5">
+              <div className="display-1 mb-3"><i className="bi bi-search text-muted"></i></div>
+              <h3>No destinations found for "{filterQuery}"</h3>
+              <p className="text-muted mb-4">Try different keywords in the search bar above</p>
+            </div>
           ) : (
+            // Empty wishlist
             <div className="text-center py-5">
               <div className="display-1 mb-3"><i className="bi bi-heart text-muted"></i></div>
               <h3>Your wishlist is empty</h3>

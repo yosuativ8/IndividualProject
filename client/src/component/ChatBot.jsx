@@ -1,17 +1,19 @@
 // ChatBot Component - Floating AI chatbot
 import { useState, useRef, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { setPlacesFromChatbot } from '../store/slices/placesSlice';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function ChatBot() {
+  const dispatch = useDispatch();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      text: '👋 Hi! Saya Tourism Assistant. Coba tanya saya tentang destinasi di Jogja, Bali, atau kota lainnya!',
+      text: `Hi! Saya Tourism Assistant. Coba tanya saya tentang destinasi di Jogja, Bali, atau kota lainnya!`,
       places: null
     }
   ]);
@@ -56,12 +58,33 @@ export default function ChatBot() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      console.log('ChatBot received response:', response.data);
+      console.log('Places:', response.data.places);
+      console.log('MapCenter:', response.data.mapCenter);
+
       const aiMessage = {
         role: 'assistant',
         text: response.data.response || 'Maaf, saya tidak dapat memproses permintaan Anda.',
         places: response.data.places || null
       };
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Dispatch ke Redux untuk update nearbyPlaces dan mapCenter
+      if (response.data.places && response.data.places.length > 0) {
+        console.log('Dispatching to Redux:', {
+          placesCount: response.data.places.length,
+          mapCenter: response.data.mapCenter
+        });
+        
+        dispatch(setPlacesFromChatbot({
+          places: response.data.places,
+          mapCenter: response.data.mapCenter
+        }));
+        
+        console.log('Redux dispatch completed');
+      } else {
+        console.log('No places to dispatch:', response.data.places);
+      }
     } catch (error) {
       console.error('ChatBot error:', error.response?.data || error.message);
       const errorMessage = {
@@ -109,37 +132,50 @@ export default function ChatBot() {
             {messages.map((msg, index) => (
               <div key={index}>
                 <div className={`mb-3 d-flex ${msg.role === 'user' ? 'justify-content-end' : 'justify-content-start'}`}>
-                  <div className={`p-3 rounded ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-white'}`}>
-                    <span>{msg.text}</span>
+                  <div className={`p-3 rounded ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-white'}`} style={{ maxWidth: '85%' }}>
+                    <span style={{ whiteSpace: 'pre-line' }}>{msg.text}</span>
                   </div>
                 </div>
                 {msg.places && msg.places.length > 0 && (
-                  <div className="mb-3">
-                    {msg.places.map((place, idx) => (
-                      <div key={idx} className="card mb-2" onClick={() => { navigate(`/place/${place.id}`); setIsOpen(false); }}>
-                        <div className="card-body p-2">
-                          <h6>{place.name}</h6>
-                          <small><i className="bi bi-geo-alt-fill"></i> {place.location}</small>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="alert alert-success mb-3" style={{ fontSize: '0.9rem' }}>
+                    <i className="bi bi-check-circle-fill me-2"></i>
+                    <strong>{msg.places.length} destinasi ditemukan!</strong>
+                    <br />
+                    <small>Scroll ke bawah untuk melihat hasil pencarian di card list 👇</small>
                   </div>
                 )}
               </div>
             ))}
-            {isLoading && <div className="text-center"><span>Thinking...</span></div>}
+            {isLoading && (
+              <div className="text-center mb-3">
+                <div className="spinner-border spinner-border-sm text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <small className="d-block mt-2 text-muted">Thinking...</small>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
           <div className="card-footer">
             <form onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Tanya tentang destinasi..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-              />
+              <div className="input-group">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Tanya tentang destinasi..."
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  disabled={isLoading}
+                />
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={isLoading || !inputMessage.trim()}
+                >
+                  <i className="bi bi-send-fill"></i>
+                </button>
+              </div>
             </form>
           </div>
         </div>

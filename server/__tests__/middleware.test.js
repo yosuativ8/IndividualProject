@@ -1,5 +1,8 @@
 // Test untuk middleware (authentication, errorHandler)
 
+// Set JWT_SECRET before importing middleware
+process.env.JWT_SECRET = 'test-jwt-secret-for-middleware-test';
+
 const authentication = require('../middleware/authentication');
 const errorHandler = require('../middleware/errorHandler');
 const { User } = require('../models');

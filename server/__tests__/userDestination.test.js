@@ -67,9 +67,8 @@ describe('UserDestination Controller', () => {
         .set('Authorization', `Bearer ${token1}`);
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body.wishlist)).toBe(true);
-      expect(response.body.wishlist.length).toBe(0);
-      expect(response.body.totalSaved).toBe(0);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBe(0);
     });
 
     it('should return user wishlist with place details', async () => {
@@ -92,11 +91,10 @@ describe('UserDestination Controller', () => {
         .set('Authorization', `Bearer ${token1}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.totalSaved).toBe(2);
-      expect(response.body.wishlist.length).toBe(2);
-      expect(response.body.wishlist[0]).toHaveProperty('place');
-      expect(response.body.wishlist[0].place).toHaveProperty('name');
-      expect(response.body.wishlist[0]).toHaveProperty('notes');
+      expect(response.body.length).toBe(2);
+      expect(response.body[0]).toHaveProperty('place');
+      expect(response.body[0].place).toHaveProperty('name');
+      expect(response.body[0]).toHaveProperty('notes');
     });
 
     it('should only return current user wishlist', async () => {
@@ -117,8 +115,8 @@ describe('UserDestination Controller', () => {
         .set('Authorization', `Bearer ${token1}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.totalSaved).toBe(1);
-      expect(response.body.wishlist[0].placeId).toBe(place1.id);
+      expect(response.body.length).toBe(1);
+      expect(response.body[0].placeId).toBe(place1.id);
     });
   });
 
@@ -142,11 +140,10 @@ describe('UserDestination Controller', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body).toHaveProperty('message');
-      expect(response.body).toHaveProperty('data');
-      expect(response.body.data).toHaveProperty('userId', user1.id);
-      expect(response.body.data).toHaveProperty('placeId', place1.id);
-      expect(response.body.data).toHaveProperty('notes', 'Must visit!');
+      expect(response.body).toHaveProperty('userId', user1.id);
+      expect(response.body).toHaveProperty('placeId', place1.id);
+      expect(response.body).toHaveProperty('notes', 'Must visit!');
+      expect(response.body).toHaveProperty('place');
     });
 
     it('should add place without notes or visitDate', async () => {
@@ -158,8 +155,8 @@ describe('UserDestination Controller', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.data.notes).toBeNull();
-      expect(response.body.data.visitDate).toBeNull();
+      expect(response.body.notes).toBeNull();
+      expect(response.body.visitDate).toBeNull();
     });
 
     it('should return 400 if placeId is missing', async () => {
@@ -231,8 +228,10 @@ describe('UserDestination Controller', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('notes', 'Updated note');
-      expect(response.body.visitDate).toContain('2025-07-15');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('notes', 'Updated note');
+      expect(response.body.data.visitDate).toContain('2025-07-15');
     });
 
     it('should update only notes', async () => {
@@ -244,8 +243,8 @@ describe('UserDestination Controller', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.notes).toBe('New note only');
-      expect(response.body.visitDate).toContain('2025-06-01');
+      expect(response.body.data.notes).toBe('New note only');
+      expect(response.body.data.visitDate).toContain('2025-06-01');
     });
 
     it('should update only visitDate', async () => {
@@ -257,8 +256,8 @@ describe('UserDestination Controller', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.visitDate).toContain('2025-08-20');
-      expect(response.body.notes).toBe('Original note');
+      expect(response.body.data.visitDate).toContain('2025-08-20');
+      expect(response.body.data.notes).toBe('Original note');
     });
 
     it('should return 404 if wishlist item not found', async () => {

@@ -1,3 +1,19 @@
 node_modules
 .env
 .pem
+
+# Test coverage
+coverage/
+*.lcov
+
+# Database files
+*.sqlite
+*.db
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db

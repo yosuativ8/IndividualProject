@@ -249,4 +249,118 @@ describe('Place Controller', () => {
       expect(response.body.message).toContain('longitude');
     });
   });
+
+  describe('GET /places/search', () => {
+    it('should search places by name', async () => {
+      const response = await request(app)
+        .get('/places/search')
+        .query({ q: 'Kuta' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('query', 'Kuta');
+      expect(response.body).toHaveProperty('count');
+      expect(response.body).toHaveProperty('places');
+      expect(Array.isArray(response.body.places)).toBe(true);
+      expect(response.body.places.length).toBeGreaterThan(0);
+      expect(response.body.places[0].name).toContain('Kuta');
+    });
+
+    it('should search places by location', async () => {
+      const response = await request(app)
+        .get('/places/search')
+        .query({ q: 'Bali' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.places.length).toBeGreaterThan(0);
+      expect(response.body.places[0].location).toContain('Bali');
+    });
+
+    it('should search places by category', async () => {
+      const response = await request(app)
+        .get('/places/search')
+        .query({ q: 'Pantai' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.places.length).toBeGreaterThan(0);
+    });
+
+    it('should return 400 if search query is missing', async () => {
+      const response = await request(app)
+        .get('/places/search');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('message');
+    });
+
+    it('should return 400 if search query is empty string', async () => {
+      const response = await request(app)
+        .get('/places/search')
+        .query({ q: '   ' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toContain('required');
+    });
+
+    it('should limit results to 20 places', async () => {
+      // Create more than 20 places
+      const manyPlaces = [];
+      for (let i = 1; i <= 25; i++) {
+        manyPlaces.push({
+          name: `Test Place ${i}`,
+          description: 'Test description',
+          location: 'Test Location',
+          latitude: -6.0 + (i * 0.1),
+          longitude: 106.0 + (i * 0.1),
+          imageUrl: 'http://example.com/test.jpg',
+          category: 'Test',
+          rating: 4.0
+        });
+      }
+      await Place.bulkCreate(manyPlaces);
+
+      const response = await request(app)
+        .get('/places/search')
+        .query({ q: 'Test' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.places.length).toBeLessThanOrEqual(20);
+    });
+
+    it('should return empty results for no matches', async () => {
+      const response = await request(app)
+        .get('/places/search')
+        .query({ q: 'NonExistentDestination123' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.count).toBe(0);
+      expect(response.body.places).toEqual([]);
+    });
+
+    it('should order results by rating DESC then createdAt DESC', async () => {
+      const response = await request(app)
+        .get('/places/search')
+        .query({ q: 'a' }); // Search with common letter
+
+      expect(response.status).toBe(200);
+      if (response.body.places.length > 1) {
+        for (let i = 0; i < response.body.places.length - 1; i++) {
+          expect(response.body.places[i].rating).toBeGreaterThanOrEqual(
+            response.body.places[i + 1].rating
+          );
+        }
+      }
+    });
+  });
+
+  describe('GET /places/:id with Geoapify place_id', () => {
+    it('should handle Geoapify place_id (long string > 50 chars)', async () => {
+      // Mock a very long place_id (Geoapify style)
+      const longPlaceId = '51f0e682c93d3f40c0594e86a1e0f1594840f00103f90113240a0000000000c00208';
+
+      const response = await request(app).get(`/places/${longPlaceId}`);
+
+      // Should return 404 because we don't have real Geoapify API in test
+      expect(response.status).toBe(404);
+    });
+  });
 });

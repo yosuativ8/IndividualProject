@@ -3,8 +3,132 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { UserDestination, Place } = require('../models');
+const { Op } = require('sequelize');
+const axios = require('axios');
 
 module.exports = class GeminiController {
+    // Helper method untuk parsing kategori dari pertanyaan
+    static parseCategoryFromQuery(message) {
+        const lowerMessage = message.toLowerCase();
+        const categoryMap = {
+            'pantai': 'beach',
+            'beach': 'beach',
+            'gunung': 'mountain',
+            'mountain': 'mountain',
+            'museum': 'museum',
+            'candi': 'attraction',
+            'temple': 'attraction',
+            'taman': 'attraction',
+            'park': 'attraction',
+            'danau': 'natural',
+            'lake': 'natural',
+            'air terjun': 'natural',
+            'waterfall': 'natural'
+        };
+
+        for (const [keyword, category] of Object.entries(categoryMap)) {
+            if (lowerMessage.includes(keyword)) {
+                return category;
+            }
+        }
+        return 'attraction'; // default
+    }
+
+    // Helper method untuk extract lokasi dari pertanyaan
+    static extractLocationFromQuery(message) {
+        // Pattern: "X di Y" atau "Y"
+        const diPattern = /(.+?)\s+di\s+(.+)/i;
+        const match = message.match(diPattern);
+        
+        if (match) {
+            // Ada pattern "X di Y"
+            return {
+                category: match[1].trim(),
+                location: match[2].trim()
+            };
+        }
+        
+        // Tidak ada pattern, anggap seluruh message adalah lokasi
+        return {
+            category: null,
+            location: message.trim()
+        };
+    }
+
+    // Helper method untuk mendapatkan gambar menggunakan Google Custom Search API
+    static async getImageForPlace(placeName, category) {
+        const lowerName = placeName.toLowerCase();
+        let searchQuery = '';
+        
+        // Priority 1: Use actual place name if it's specific enough
+        if (placeName && placeName.length > 3 && placeName !== 'Tempat Wisata') {
+            // Remove generic words
+            const cleanName = placeName.replace(/tempat wisata|destinasi|wisata/gi, '').trim();
+            
+            // Check if it's a specific place name
+            if (cleanName.length > 3) {
+                searchQuery = `${cleanName} tourist destination`;
+            }
+        }
+        
+        // Priority 2: Use specific destination keywords if match
+        if (!searchQuery) {
+            // Just use the place name as is for better worldwide results
+            if (placeName.length > 5) {
+                searchQuery = `${placeName} landmark tourist attraction`;
+            }
+        }
+        
+        // Priority 3: Use category-based keywords as last resort
+        if (!searchQuery) {
+            if (category === 'Beach' || category === 'Pantai') {
+                searchQuery = 'beach tourism destination';
+            } else if (category === 'Mountain' || category === 'Gunung') {
+                searchQuery = 'mountain tourism destination';
+            } else if (category === 'Museum') {
+                searchQuery = 'museum tourist attraction';
+            } else if (category === 'Attraction' || category === 'Temple') {
+                searchQuery = 'famous landmark tourist attraction';
+            } else if (category === 'Nature' || category === 'Park') {
+                searchQuery = 'nature park tourism';
+            } else {
+                searchQuery = 'tourist destination landmark';
+            }
+        }
+        
+        // Use Google Custom Search API for accurate image results
+        try {
+            const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+                params: {
+                    key: process.env.GOOGLE_API_KEY,
+                    cx: process.env.GOOGLE_CSE_ID,
+                    q: searchQuery,
+                    searchType: 'image',
+                    num: 1,
+                    imgSize: 'large',
+                    imgType: 'photo',
+                    safe: 'active'
+                }
+            });
+            
+            if (response.data && response.data.items && response.data.items.length > 0) {
+                const imageUrl = response.data.items[0].link;
+                console.log(`Found image for "${searchQuery}": ${imageUrl}`);
+                return imageUrl;
+            }
+            
+            // Fallback to Unsplash Source if no results
+            console.log(`No Google Image results for "${searchQuery}", using Unsplash fallback`);
+            return `https://source.unsplash.com/800x600/?${searchQuery.replace(/\s/g, ',')}`;
+        } catch (error) {
+            console.error('Google Custom Search API error:', error.response?.status || error.message);
+            
+            // Fallback to Unsplash Source if API fails (403, quota exceeded, etc)
+            console.log(`Using Unsplash fallback for "${searchQuery}"`);
+            return `https://source.unsplash.com/800x600/?${searchQuery.replace(/\s/g, ',')}`;
+        }
+    }
+
     // Method untuk AI Trip Planner - Generate itinerary based on wishlist dan preferences
     // Endpoint: POST /gemini/trip-planner
     // Access: Private (perlu login)
@@ -114,7 +238,7 @@ Pastikan:
 `;
 
             // Request ke Gemini AI
-            const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             let text = response.text();
@@ -164,6 +288,7 @@ Pastikan:
             // Search for relevant places in database based on message
             const searchKeywords = message.toLowerCase().match(/\b\w{4,}\b/g) || [];
             let relevantPlaces = [];
+            let mapCenter = null;
             
             if (searchKeywords.length > 0) {
                 relevantPlaces = await Place.findAll({ // Mencari places yang relevan dengan keywords
@@ -178,9 +303,20 @@ Pastikan:
                         }))
                     },
                     limit: 5,
-                    attributes: ['id', 'name', 'description', 'location', 'category', 'rating', 'imageUrl'] // fields to return
+                    attributes: ['id', 'name', 'description', 'location', 'category', 'rating', 'imageUrl', 'latitude', 'longitude'] // fields to return
                 });
+                
+                // Set map center jika ada hasil dari DB
+                if (relevantPlaces.length > 0 && relevantPlaces[0].latitude && relevantPlaces[0].longitude) {
+                    mapCenter = {
+                        lat: relevantPlaces[0].latitude,
+                        lon: relevantPlaces[0].longitude,
+                        zoom: 10
+                    };
+                }
             }
+            
+            console.log('Database results:', relevantPlaces.length);
 
             // Ambil context user (wishlist untuk personalized response)
             const userWishlist = await UserDestination.findAll({
@@ -204,65 +340,195 @@ Pastikan:
                 ? `\n\nRelevant places from database:\n${relevantPlaces.map(p => 
                     `- ${p.name} (${p.location})\n  Category: ${p.category}\n  Rating: ${p.rating}/5\n  Description: ${p.description?.substring(0, 150)}...`
                 ).join('\n\n')}`
-                : '';
+                : '\n\nNo relevant places in database. Generate new recommendations based on user query.';
 
             // Build conversation history for context
             const historyText = conversationHistory.length > 0
                 ? '\n\nPrevious conversation:\n' + conversationHistory.slice(-3).map(h => `${h.role}: ${h.text}`).join('\n')
                 : '';
 
-            // Build system prompt
+            // Build system prompt untuk JSON response
             const systemPrompt = `
-Saya adalah Tourism Assistant AI yang membantu travelers merencanakan perjalanan wisata di Indonesia.
-Saya ramah, informatif, dan selalu memberikan jawaban yang praktis dan berguna.
-
-Kemampuan saya:
-- Memberikan rekomendasi destinasi wisata
-- Menjawab pertanyaan tentang tempat wisata (akses, harga, waktu terbaik berkunjung)
-- Tips traveling (budget, transportasi, akomodasi, makanan)
-- Informasi budaya dan keamanan
-- Rekomendasi itinerary
+Saya adalah Tourism Assistant AI yang membantu travelers merencanakan perjalanan wisata di seluruh dunia.
 
 User context:${userContext}${placesContext}${historyText}
 
 User question: ${message}
 
-Jawab dengan:
-1. Singkat dan jelas (2-4 paragraf)
-2. Berikan informasi praktis (harga, waktu, akses)
-3. Jika menemukan tempat wisata dari database, sebutkan dengan detail
-4. Jika ada, referensikan tempat yang user sudah save
-5. Gunakan bahasa Indonesia yang ramah dan engaging
-6. Format dengan paragraph breaks untuk readability
+Response HARUS dalam format JSON dengan struktur:
+{
+  "reply": "string - Jawaban singkat 2-3 kalimat dengan format: salam pembuka + jumlah destinasi + call to action",
+  "places": [
+    {
+      "name": "string - Nama destinasi lengkap",
+      "location": "string - Kota, Negara (contoh: Tokyo, Japan atau Bali, Indonesia)",
+      "category": "string - Beach/Mountain/Temple/Museum/Park/Nature/Attraction",
+      "description": "string - Deskripsi singkat 1-2 kalimat tentang keunikan tempat",
+      "latitude": number,
+      "longitude": number,
+      "rating": number (4.0-5.0)
+    }
+  ]
+}
+
+ATURAN PENTING:
+1. "reply" maksimal 3 kalimat (contoh: "Berikut 5 destinasi wisata di Tokyo yang wajib dikunjungi! Lihat detail lengkap di card list di bawah 🗺️")
+2. "places" array berisi 5-10 destinasi wisata ASLI sesuai query user dengan KOORDINAT YANG BENAR
+3. Setiap place HARUS punya koordinat latitude/longitude yang AKURAT untuk lokasi tersebut
+4. Nama destinasi harus SPESIFIK (contoh: "Tokyo Tower", "Eiffel Tower", "Candi Borobudur")
+5. Lokasi format: "Kota, Negara" (contoh: "Paris, France" atau "Bali, Indonesia")
+6. Category: Beach, Mountain, Temple, Museum, Park, Nature, atau Attraction
+7. JANGAN include deskripsi panjang dalam reply, taruh di places.description
+8. Response HARUS valid JSON, jangan tambahkan markdown atau penjelasan lain
+9. Sesuaikan destinasi dengan query user - jika tanya Jepang beri destinasi Jepang, jika tanya Bali beri destinasi Bali
+
+Contoh response yang BENAR untuk "destinasi di medan":
+{
+  "reply": "Berikut 5 destinasi wisata menarik di Medan! Scroll ke bawah untuk melihat foto, rating, dan detailnya 🗺️",
+  "places": [
+    {
+      "name": "Istana Maimun",
+      "location": "Medan, Sumatera Utara",
+      "category": "Candi",
+      "description": "Istana kerajaan Kesultanan Deli dengan arsitektur Melayu-Islam yang megah.",
+      "latitude": 3.5752,
+      "longitude": 98.6837,
+      "rating": 4.5
+    },
+    {
+      "name": "Masjid Raya Medan",
+      "location": "Medan, Sumatera Utara", 
+      "category": "Candi",
+      "description": "Masjid berarsitektur Timur Tengah dengan kubah hijau yang ikonik.",
+      "latitude": 3.5760,
+      "longitude": 98.6849,
+      "rating": 4.6
+    }
+  ]
+}
 `;
 
-            // Request ke Gemini AI
+            // Request ke Gemini AI untuk SEMUA query (baik DB ada hasil atau tidak)
             console.log('=== Requesting Gemini AI ===');
-            console.log('Model: gemini-1.5-flash');
+            console.log('Model: gemini-flash-lite-latest');
             console.log('API Key configured:', !!process.env.GEMINI_API_KEY);
+            console.log('DB results:', relevantPlaces.length);
             
             let reply;
+            const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
+            
             try {
-                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
                 const result = await model.generateContent(systemPrompt);
                 const aiResponse = await result.response;
-                reply = aiResponse.text();
-                console.log('✅ Gemini AI response received successfully');
-                console.log('Response length:', reply.length);
+                let rawText = aiResponse.text();
+                console.log('✅ Gemini AI response received');
+                
+                // Clean markdown code blocks jika ada
+                rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                
+                // Parse JSON response dari Gemini
+                const geminiData = JSON.parse(rawText);
+                reply = geminiData.reply;
+                
+                console.log('Parsed Gemini data:', { 
+                    replyLength: reply.length, 
+                    placesCount: geminiData.places?.length 
+                });
+                
+                // Jika Gemini memberikan places, fetch gambar untuk setiap destinasi
+                if (geminiData.places && geminiData.places.length > 0) {
+                    console.log(`🖼️ Fetching images for ${geminiData.places.length} places from Google Custom Search...`);
+                    
+                    // Parallel fetch images untuk semua places
+                    const placesWithImages = await Promise.all(
+                        geminiData.places.map(async (place) => {
+                            // Cari place di database berdasarkan name
+                            const dbPlace = await Place.findOne({
+                                where: {
+                                    name: {
+                                        [Op.iLike]: `%${place.name}%`
+                                    }
+                                }
+                            });
+                            
+                            // Jika ditemukan di database, gunakan data database (termasuk ID dan imageUrl dari seed)
+                            if (dbPlace) {
+                                console.log(`✓ Found in DB: ${dbPlace.name} (ID: ${dbPlace.id})`);
+                                return {
+                                    id: dbPlace.id,  // Gunakan ID integer dari database
+                                    name: dbPlace.name,
+                                    description: dbPlace.description,
+                                    location: dbPlace.location,
+                                    latitude: dbPlace.latitude,
+                                    longitude: dbPlace.longitude,
+                                    imageUrl: dbPlace.imageUrl,  // Gunakan imageUrl dari seed yang sudah akurat
+                                    category: dbPlace.category,
+                                    rating: dbPlace.rating
+                                };
+                            }
+                            
+                            // Jika tidak ditemukan di database, fetch image dari Google (fallback)
+                            console.log(`⚠ Not in DB, fetching image for: ${place.name}`);
+                            const imageUrl = await GeminiController.getImageForPlace(place.name, place.category);
+                            
+                            return {
+                                id: null,  // No ID karena tidak ada di database
+                                name: place.name,
+                                description: place.description || `Destinasi wisata menarik di ${place.location}`,
+                                location: place.location,
+                                latitude: place.latitude,
+                                longitude: place.longitude,
+                                imageUrl: imageUrl,
+                                category: place.category,
+                                rating: place.rating || 4.5
+                            };
+                        })
+                    );
+                    
+                    // Override relevantPlaces dengan hasil dari Gemini + gambar
+                    relevantPlaces = placesWithImages;
+                    
+                    // Append destination names to reply
+                    if (placesWithImages.length > 0) {
+                        const destinationNames = placesWithImages.map((p, idx) => `${idx + 1}. ${p.name}`).join('\n');
+                        reply += `\n\n📍 Destinasi yang ditemukan:\n${destinationNames}`;
+                    }
+                    
+                    // Set map center ke destinasi pertama
+                    if (placesWithImages[0].latitude && placesWithImages[0].longitude) {
+                        mapCenter = {
+                            lat: placesWithImages[0].latitude,
+                            lon: placesWithImages[0].longitude,
+                            zoom: 11
+                        };
+                    }
+                    
+                    console.log(`✅ Successfully processed ${placesWithImages.length} places with images`);
+                    console.log('First place:', placesWithImages[0].name, placesWithImages[0].location);
+                } else if (relevantPlaces.length > 0) {
+                    // Jika Gemini tidak return places, tapi DB punya data, pakai DB data
+                    console.log('Using database results');
+                    
+                    // Append destination names from DB to reply
+                    const destinationNames = relevantPlaces.map((p, idx) => `${idx + 1}. ${p.name}`).join('\n');
+                    if (!reply.includes('📍 Destinasi')) {
+                        reply += `\n\n📍 Destinasi yang ditemukan:\n${destinationNames}`;
+                    }
+                }
+                
             } catch (geminiError) {
-                console.error('Gemini API error:', geminiError.message);
-                console.error('Error details:', geminiError.response?.data || geminiError);
+                console.error('❌ Gemini API error:', geminiError.message);
+                console.error('Error stack:', geminiError.stack);
                 
                 // Fallback response jika Gemini tidak tersedia
                 if (relevantPlaces.length > 0) {
                     // Jika ada places yang relevan dari database
-                    reply = `Saya menemukan ${relevantPlaces.length} tempat wisata yang sesuai dengan pencarian Anda!\n\n`;
-                    relevantPlaces.forEach((place, idx) => {
-                        reply += `${idx + 1}. ${place.name} (${place.location})\n`;
-                        reply += `   Kategori: ${place.category} | Rating: ${place.rating}/5\n`;
-                        reply += `   ${place.description?.substring(0, 100)}...\n\n`;
+                    const locationName = message.toLowerCase().includes('di') ? message.split('di')[1]?.trim() : 'area ini';
+                    reply = `Berikut rekomendasi destinasi di ${locationName}:\n\n`;
+                    relevantPlaces.forEach((place) => {
+                        reply += `• ${place.name}\n`;
                     });
-                    reply += 'Klik pada card di bawah untuk melihat detail lengkap!';
+                    reply += `\nLihat detail lengkap, foto, dan rating di card list di bawah! 🗺️`;
                 } else {
                     // Smart fallback for greetings and casual messages
                     const lowerMessage = message.toLowerCase().trim();
@@ -297,6 +563,7 @@ Jawab dengan:
             res.status(200).json({
                 response: reply,
                 places: relevantPlaces.length > 0 ? relevantPlaces : null,
+                mapCenter: mapCenter, // Koordinat untuk center map
                 conversationId: conversationHistory.length + 1
             });
         } catch (error) {
@@ -400,7 +667,7 @@ Format response dalam JSON:
 `;
 
             // Request ke Gemini AI
-            const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             let text = response.text();
@@ -454,7 +721,7 @@ Deskripsi harus:
 Format plain text, tidak perlu markdown atau bullet points.
 `;
 
-            const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const description = response.text();

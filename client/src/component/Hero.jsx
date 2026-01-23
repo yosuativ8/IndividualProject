@@ -1,5 +1,6 @@
 // Hero Component - Komponen hero section untuk Home page
 // Menampilkan welcome message dan call-to-action
+// Juga menampilkan fitur utama aplikasi dan integrasi API
 
 import React from 'react';
 import SearchBar from './SearchBar';

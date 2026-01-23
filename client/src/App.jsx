@@ -28,7 +28,8 @@ function AppContent() {
   
   // Hide navbar and chatbot on login and register pages
   const hideNavbar = location.pathname === '/login' || location.pathname === '/register';
-  const hideChatBot = location.pathname === '/login' || location.pathname === '/register';
+  // Hide ChatBot on login, register, and wishlist pages - ChatBot hanya di Home
+  const hideChatBot = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/wishlist';
 
   // Fetch wishlist on app load if user is authenticated
   useEffect(() => {
