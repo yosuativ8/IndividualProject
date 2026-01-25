@@ -1,3 +1,20 @@
+/**
+ * MapSelector Component
+ * 
+ * Interactive map menggunakan React-Leaflet untuk:
+ * - Tampilkan places terdekat dengan markers
+ * - User bisa klik map untuk select location
+ * - Auto-center map saat receive mapCenter dari Redux
+ * - Support chatbot integration (auto-update dari chat results)
+ * 
+ * Props:
+ * @param {function} onLocationSelect - Callback saat user klik map
+ * @param {object} selectedLocation - Current selected location {lat, lon}
+ * @param {object} mapCenter - Center point dari Redux {lat, lon, zoom}
+ * @param {array} places - Array places untuk tampilkan markers
+ * 
+ * @component
+ */
 import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -21,7 +38,12 @@ const redIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Component to handle map centering when mapCenter prop changes
+/**
+ * MapCenterController Helper Component
+ * 
+ * Handle automatic map centering saat mapCenter prop berubah.
+ * Digunakan untuk smooth animation saat chatbot update map center.
+ */
 function MapCenterController({ center, zoom }) {
   const map = useMap();
   
@@ -37,7 +59,12 @@ function MapCenterController({ center, zoom }) {
   return null;
 }
 
-// Component untuk handle click events pada map
+/**
+ * MapClickHandler Helper Component
+ * 
+ * Handle click events pada map.
+ * Trigger onLocationSelect callback dengan koordinat yang diklik.
+ */
 function MapClickHandler({ onLocationSelect }) {
   const map = useMap();
   

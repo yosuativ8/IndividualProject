@@ -1,6 +1,29 @@
-// Login Page - Halaman untuk Login, Register, dan Google Sign-In
-// Non-user bisa lihat destinasi tapi tidak bisa add wishlist atau chatbot
-// Hanya user login yang bisa access features tersebut
+/**
+ * Login Page Component
+ * 
+ * Halaman login untuk user dengan dua metode autentikasi:
+ * 1. Email & Password (traditional authentication)
+ * 2. Google Sign-In (OAuth 2.0)
+ * 
+ * Features:
+ * - Form validation (email format, required fields)
+ * - Loading state saat submit
+ * - Error handling dengan alert display
+ * - Integration dengan Google OAuth
+ * - Link ke Register page
+ * - Browse as Guest option
+ * 
+ * User Flow:
+ * - Input email & password → Submit → Login → Redirect to Home
+ * - Atau klik Google Sign-In → OAuth popup → Auto login → Redirect to Home
+ * - Error → Display error message di alert
+ * 
+ * Access: Public (tidak perlu login untuk akses page ini)
+ * 
+ * @component
+ * @example
+ * <Route path="/login" element={<Login />} />
+ */
 
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -10,6 +33,7 @@ import { fetchWishlist } from '../store/slices/wishlistSlice';
 import { GoogleLogin } from '@react-oauth/google';
 
 export default function Login() {
+  // Local state untuk form data (controlled components)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -17,50 +41,87 @@ export default function Login() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  
+  // Redux state untuk loading & error
   const { isLoading, error } = useSelector((state) => state.auth);
 
   /**
-   * Handle perubahan input form (email & password)
-   * Update state formData setiap kali user mengetik
+   * Handle Input Change
+   * 
+   * Update formData state setiap kali user mengetik di input field.
+   * Menggunakan computed property name [e.target.name] untuk dynamic key.
+   * 
+   * @param {Event} e - Input change event
    */
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value // Dynamic key: 'email' atau 'password'
     });
   };
 
   /**
-   * Handle submit form login dengan email & password
-   * - Dispatch action login ke Redux
-   * - Fetch wishlist setelah login berhasil
-   * - Navigate ke home page
+   * Handle Form Submit (Email & Password Login)
+   * 
+   * Flow:
+   * 1. Prevent default form submission (no page reload)
+   * 2. Dispatch login action dengan email & password
+   * 3. Wait for login success (unwrap Promise)
+   * 4. Fetch wishlist data setelah login berhasil
+   * 5. Navigate ke home page
+   * 6. Jika error → catch dan log (error akan tampil dari Redux state)
+   * 
+   * @param {Event} e - Form submit event
    */
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent page reload
     
     try {
+      // Dispatch login action dan wait for success
       await dispatch(login({
         email: formData.email,
         password: formData.password
-      })).unwrap();
+      })).unwrap(); // unwrap() throw error jika rejected
+      
+      // Fetch wishlist setelah login berhasil
       await dispatch(fetchWishlist());
+      
+      // Redirect ke home page
       navigate('/');
     } catch (err) {
+      // Error akan ditampilkan otomatis dari Redux state di UI
       console.error('Auth error:', err);
     }
   };
 
   /**
-   * Handle Google Login success
-   * - Verifikasi token dari Google OAuth
-   * - Login hanya jika user sudah pernah register via Google
-   * - Fetch wishlist dan redirect ke home
+   * Handle Google Login Success
+   * 
+   * Callback yang dipanggil ketika user berhasil login via Google OAuth.
+   * Google akan return credential (JWT token) yang berisi user info.
+   * 
+   * Flow:
+   * 1. Terima credential dari Google OAuth popup
+   * 2. Dispatch googleLogin action dengan credential
+   * 3. Backend akan verify token dan login user
+   * 4. Fetch wishlist setelah login berhasil
+   * 5. Navigate ke home page
+   * 
+   * Note: Google Login hanya untuk user yang SUDAH register via Google.
+   * Jika email belum terdaftar, backend akan return error.
+   * 
+   * @param {Object} credentialResponse - Response dari Google OAuth
+   * @param {string} credentialResponse.credential - Google ID token (JWT)
    */
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
+      // Dispatch googleLogin dengan Google credential token
       await dispatch(googleLogin(credentialResponse.credential)).unwrap();
+      
+      // Fetch wishlist setelah login berhasil
       await dispatch(fetchWishlist());
+      
+      // Redirect ke home
       navigate('/');
     } catch (err) {
       console.error('Google Login error:', err);
@@ -69,8 +130,15 @@ export default function Login() {
   };
 
   /**
-   * Handle Google Login error
-   * Tampilkan alert jika OAuth popup gagal atau dibatalkan
+   * Handle Google Login Error
+   * 
+   * Callback yang dipanggil ketika Google OAuth gagal atau dibatalkan user.
+   * Scenarios:
+   * - User close OAuth popup
+   * - Network error
+   * - Google OAuth service down
+   * 
+   * @param {Object} error - Error object dari Google OAuth
    */
   const handleGoogleError = () => {
     alert('Google Sign-In failed. Please try again.');

@@ -1,4 +1,16 @@
-// ChatBot Component - Floating AI chatbot
+/**
+ * ChatBot Component - Floating AI Assistant
+ * 
+ * Fitur:
+ * - Chat dengan AI untuk rekomendasi destinasi wisata
+ * - Powered by Google Gemini AI
+ * - Auto-fetch nearby places berdasarkan chat response
+ * - Dispatch results ke Redux dan trigger map view di Home
+ * - Conversation history untuk context-aware responses
+ * - Requires authentication
+ * 
+ * @component
+ */
 import { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +37,7 @@ export default function ChatBot() {
   const { isAuthenticated } = useSelector((state) => state.auth);
   const token = localStorage.getItem('token');
 
+  // Auto-scroll ke bottom saat ada message baru
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -33,6 +46,13 @@ export default function ChatBot() {
     scrollToBottom();
   }, [messages]);
 
+  /**
+   * Handle send message ke AI
+   * - Check authentication
+   * - Send message + conversation history ke backend
+   * - Parse response untuk places data
+   * - Dispatch places ke Redux jika ada results
+   */
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputMessage.trim()) return;

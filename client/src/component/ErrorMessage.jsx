@@ -1,6 +1,14 @@
-// ErrorMessage Component - Komponen untuk menampilkan error message
-// Digunakan saat terjadi error dalam fetching data atau operasi lainnya
-
+/**
+ * ErrorMessage Component
+ * 
+ * Menampilkan error message dengan icon dan retry button.
+ * 
+ * Props:
+ * @param {string} message - Error message yang akan ditampilkan
+ * @param {function} onRetry - Callback function untuk retry action (optional)
+ * 
+ * @component
+ */
 import React from 'react';
 
 export default function ErrorMessage({ message, onRetry }) {

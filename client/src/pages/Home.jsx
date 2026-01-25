@@ -1,6 +1,26 @@
-// Home Page - Halaman utama aplikasi
-// Menampilkan daftar semua places dalam grid layout
-// Non-user bisa lihat tapi tidak bisa add wishlist
+/**
+ * Home Page Component
+ * 
+ * Halaman utama aplikasi NextTrip yang menampilkan:
+ * - Hero section dengan background slideshow
+ * - Grid layout destinasi wisata
+ * - Filter by category (All/Pantai/Gunung/dll)
+ * - Toggle between All Places vs Nearby Places
+ * - Interactive map untuk select location
+ * - Integration dengan ChatBot results
+ * 
+ * Features:
+ * - Auto-slide background images (5 detik interval)
+ * - Lazy load places (Show More/Less)
+ * - Location-based search (map click)
+ * - Responsive grid layout (1-3 columns)
+ * 
+ * Access: Public (semua user bisa lihat, tapi wishlist butuh login)
+ * 
+ * @component
+ * @example
+ * <Route path="/" element={<Home />} />
+ */
 
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -11,19 +31,22 @@ import MapSelector from '../component/MapSelector';
 
 export default function Home() {
   const dispatch = useDispatch();
+  
+  // Redux state untuk places data dan loading state
   const { places, nearbyPlaces, mapCenter, showChatbotResults, filterQuery, isLoading, error } = useSelector((state) => state.places);
   const { isAuthenticated } = useSelector((state) => state.auth);
   
-  // State untuk koordinat lokasi yang dipilih dari map
-  const [selectedLocation, setSelectedLocation] = useState(null);
-  // State untuk toggle antara all places vs nearby places
-  const [showNearby, setShowNearby] = useState(false);
-  // State untuk toggle "Show More" / "Show Less" places
-  const [showAll, setShowAll] = useState(false);
-  // State untuk track index background image yang sedang aktif
-  const [currentBgIndex, setCurrentBgIndex] = useState(0);
+  // Local state untuk UI controls
+  const [selectedLocation, setSelectedLocation] = useState(null); // Koordinat dari map
+  const [showNearby, setShowNearby] = useState(false); // Toggle all places vs nearby
+  const [showAll, setShowAll] = useState(false); // Toggle show 6 vs show all
+  const [currentBgIndex, setCurrentBgIndex] = useState(0); // Index background slideshow
 
-  // Array background images untuk slideshow
+  /**
+   * Background Images Array
+   * Array URL gambar untuk hero background slideshow
+   * Auto-slide setiap 5 detik (controlled by useEffect)
+   */
   const backgroundImages = [
     'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1920&q=80', // Bali temple
     'https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=1920&q=80', // Beach sunset
@@ -33,7 +56,15 @@ export default function Home() {
   ];
 
   /**
-   * useEffect untuk auto switch ke nearby mode ketika ChatBot mengirim hasil
+   * Effect: Handle ChatBot Results
+   * 
+   * Ketika ChatBot mengirim hasil pencarian:
+   * - Auto switch ke nearby mode
+   * - Set map center ke koordinat hasil
+   * - Reset showAll ke false (show 6 cards first)
+   * - Reset chatbot results flag
+   * 
+   * Dependencies: showChatbotResults, nearbyPlaces.length, mapCenter
    */
   useEffect(() => {
     if (showChatbotResults) {

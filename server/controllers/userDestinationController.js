@@ -1,13 +1,65 @@
-// userDestinationController untuk mengelola wishlist/bucket list destinasi user
-// Controller ini menangani CRUD operasi untuk destinasi yang disimpan user
+/**
+ * UserDestinationController
+ * 
+ * Controller untuk mengelola wishlist/bucket list destinasi user.
+ * Controller ini menangani CRUD operasi untuk destinasi yang disimpan user:
+ * - Create: Tambah destinasi ke wishlist
+ * - Read: Lihat daftar wishlist
+ * - Update: Update notes dan visit date
+ * - Delete: Hapus dari wishlist
+ * 
+ * Semua endpoints PRIVATE (butuh authentication).
+ * User hanya bisa akses wishlist miliknya sendiri (authorization by ownership).
+ */
 
 // Import models
 const { UserDestination, Place, User } = require('../models');
 
 module.exports = class UserDestinationController {
-    // Method untuk mendapatkan semua destinasi yang disimpan oleh user (wishlist)
-    // Endpoint: GET /wishlist
-    // Access: Private (perlu login)
+    /**
+     * Get User Wishlist
+     * 
+     * Method untuk mendapatkan semua destinasi yang disimpan oleh user.
+     * Data di-join dengan Place untuk mendapatkan detail lengkap destinasi.
+     * 
+     * @route GET /wishlist
+     * @access Private (perlu login)
+     * 
+     * @param {Object} req.user - User data dari authentication middleware
+     * @param {number} req.user.id - ID user yang sedang login
+     * 
+     * @returns {Array<Object>} Array of wishlist items (200 OK)
+     * @returns {number} .id - UserDestination ID
+     * @returns {number} .userId - User ID
+     * @returns {number} .placeId - Place ID
+     * @returns {string} .notes - Notes dari user
+     * @returns {Date} .visitDate - Planned visit date
+     * @returns {Object} .place - Detail place (joined)
+     * 
+     * @example
+     * // Request
+     * GET /wishlist
+     * Headers: { Authorization: \"Bearer <token>\" }
+     * 
+     * // Response
+     * [
+     *   {
+     *     \"id\": 1,
+     *     \"userId\": 1,
+     *     \"placeId\": 5,
+     *     \"notes\": \"Must visit with family\",
+     *     \"visitDate\": \"2025-06-15\",
+     *     \"place\": {
+     *       \"id\": 5,
+     *       \"name\": \"Borobudur Temple\",
+     *       \"location\": \"Magelang, Central Java\",
+     *       \"imageUrl\": \"https://...\",
+     *       \"category\": \"Candi\",
+     *       \"rating\": 4.8
+     *     }
+     *   }
+     * ]
+     */
     static async getUserWishlist(req, res, next) {
         try {
             // Ambil userId dari req.user (sudah di-set oleh authentication middleware)

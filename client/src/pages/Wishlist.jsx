@@ -1,3 +1,34 @@
+/**
+ * Wishlist Page Component
+ * 
+ * Halaman untuk menampilkan semua destinasi yang disimpan user (saved places).
+ * 
+ * Features:
+ * - Display all wishlist items dalam grid layout
+ * - Filter/search wishlist by keyword (integrated dengan Navbar search)
+ * - Empty state dengan call-to-action button
+ * - Error handling dengan retry button
+ * - Loading state dengan spinner
+ * - Auto redirect ke login jika user belum login
+ * 
+ * Data Structure:
+ * - Wishlist items berisi relasi UserDestination + Place (joined data)
+ * - Setiap item punya: id, placeId, notes, visitDate, place (detail destinasi)
+ * 
+ * Access: Private (harus login, auto redirect ke /login jika belum)
+ * 
+ * @component
+ * @example
+ * <Route 
+ *   path="/wishlist" 
+ *   element={
+ *     <ProtectedRoute>
+ *       <Wishlist />
+ *     </ProtectedRoute>
+ *   } 
+ * />
+ */
+
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -7,14 +38,19 @@ import PlaceCard from '../component/PlaceCard';
 export default function Wishlist() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  
+  // Redux state
   const { isAuthenticated } = useSelector((state) => state.auth);
   const { items, isLoading, error } = useSelector((state) => state.wishlist);
-  const { filterQuery } = useSelector((state) => state.places); // Get filter from Navbar
+  const { filterQuery } = useSelector((state) => state.places); // Search query dari Navbar
 
   /**
-   * useEffect untuk:
-   * - Redirect ke login jika user belum login
+   * Effect: Authentication Check & Fetch Wishlist
+   * 
+   * - Redirect ke login page jika user belum login
    * - Fetch wishlist data saat component mount
+   * 
+   * Dependencies: dispatch, isAuthenticated, navigate
    */
   useEffect(() => {
     if (!isAuthenticated) {

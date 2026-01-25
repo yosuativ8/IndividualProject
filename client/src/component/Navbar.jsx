@@ -1,5 +1,30 @@
-// Navbar Component - Navigation bar dengan search bar dan auth
-// Search bar ada di navbar, logout button untuk authenticated users
+/**
+ * Navbar Component
+ * 
+ * Global navigation bar yang muncul di semua pages.
+ * 
+ * Features:
+ * - Brand logo dengan animation effect
+ * - Search bar untuk filter places (integrated dengan Redux)
+ * - Wishlist link (hanya untuk authenticated users)
+ * - Login/Register links (untuk guest users)
+ * - Logout button (untuk authenticated users)
+ * - Responsive mobile menu (Bootstrap collapse)
+ * - Gradient background dengan modern styling
+ * 
+ * Search Functionality:
+ * - Search query disimpan di Redux state (placesSlice.filterQuery)
+ * - Home page & Wishlist page akan auto-filter berdasarkan query ini
+ * - Real-time filtering (onChange event)
+ * 
+ * Authentication States:
+ * - Guest: Display Login + Register links
+ * - Authenticated: Display Wishlist link + user email + Logout button
+ * 
+ * @component
+ * @example
+ * <Navbar />
+ */
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -12,22 +37,40 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 export default function Navbar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  
+  // Redux state
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   const { filterQuery } = useSelector((state) => state.places);
 
-  // Handle logout
+  /**
+   * Handle Logout
+   * 
+   * - Dispatch logout action (clear Redux state + localStorage)
+   * - Navigate ke login page
+   */
   const handleLogout = () => {
     dispatch(logout());
     navigate('/login');
   };
 
-  // Handle filter - update Redux state untuk filter cards di Home/Wishlist
+  /**
+   * Handle Filter Change
+   * 
+   * Update Redux state dengan search query.
+   * Home page & Wishlist page akan react to this change dan filter cards.
+   * 
+   * @param {Event} e - Input change event
+   */
   const handleFilterChange = (e) => {
     const query = e.target.value;
     dispatch(setFilterQuery(query));
   };
   
-  // Clear filter
+  /**
+   * Clear Filter
+   * 
+   * Reset search query ke empty string.
+   */
   const handleClearFilter = () => {
     dispatch(setFilterQuery(''));
   };

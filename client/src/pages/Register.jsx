@@ -1,3 +1,31 @@
+/**
+ * Register Page Component
+ * 
+ * Halaman registrasi untuk user baru dengan dua metode:
+ * 1. Email & Password (traditional registration)
+ * 2. Google Sign-Up (OAuth 2.0)
+ * 
+ * Features:
+ * - Form validation (email format, password min 6 chars)
+ * - Loading state saat submit
+ * - Error handling dengan alert display
+ * - Integration dengan Google OAuth
+ * - Auto redirect ke login page setelah register berhasil (email/password)
+ * - Auto login setelah Google register berhasil
+ * - Link ke Login page
+ * - Browse as Guest option
+ * 
+ * User Flow:
+ * - Email/Password: Input → Submit → Success alert → Redirect to Login
+ * - Google: Klik button → OAuth popup → Auto register + login → Redirect to Home
+ * 
+ * Access: Public (tidak perlu login untuk akses page ini)
+ * 
+ * @component
+ * @example
+ * <Route path="/register" element={<Register />} />
+ */
+
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
@@ -6,6 +34,7 @@ import { fetchWishlist } from '../store/slices/wishlistSlice';
 import { GoogleLogin } from '@react-oauth/google';
 
 export default function Register() {
+  // Local state untuk form data (controlled components)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -13,11 +42,16 @@ export default function Register() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  
+  // Redux state untuk loading & error
   const { isLoading, error } = useSelector((state) => state.auth);
 
   /**
-   * Handle perubahan input form (email & password)
-   * Update state formData setiap kali user mengetik
+   * Handle Input Change
+   * 
+   * Update formData state setiap kali user mengetik di input field.
+   * 
+   * @param {Event} e - Input change event
    */
   const handleChange = (e) => {
     setFormData({

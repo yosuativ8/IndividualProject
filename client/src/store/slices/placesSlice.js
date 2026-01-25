@@ -1,23 +1,75 @@
-// Places Slice - State management untuk data tempat wisata
-// Mengelola state untuk daftar places, detail place, search, dan nearby places
-// Data di-fetch dari backend API dan disimpan di Redux store
+/**
+ * Places Slice - Redux State Management untuk Data Tempat Wisata
+ * 
+ * Mengelola state untuk semua operasi terkait places (tempat wisata):
+ * - Fetch semua places dari database (public)
+ * - Fetch detail place by ID
+ * - Search places by location (Geoapify API)
+ * - Fetch nearby places by coordinates (Geoapify API)
+ * - Get AI recommendation untuk place (Google Gemini)
+ * 
+ * State Structure:
+ * - places: Array semua places dari database
+ * - currentPlace: Object detail place yang sedang dilihat
+ * - searchResults: Array hasil pencarian dari Geoapify
+ * - nearbyPlaces: Array places terdekat (persist di localStorage)
+ * - aiRecommendation: String rekomendasi AI dari Gemini
+ * - mapCenter: Object {lat, lon} untuk center map (persist)
+ * - showChatbotResults: Boolean untuk trigger tampilan hasil chatbot
+ * - filterQuery: String global filter dari Navbar
+ * - isLoading: Boolean loading state
+ * - error: String error message
+ * 
+ * Persistence:
+ * - nearbyPlaces & mapCenter disimpan di localStorage
+ * - Auto-restore saat app reload untuk better UX
+ * 
+ * @module placesSlice
+ */
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
+// Base URL API dari environment variable
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-// Helper function untuk get token dari localStorage
+/**
+ * Helper: Get Authentication Header
+ * 
+ * Ambil token dari localStorage dan format sebagai Bearer token.
+ * 
+ * @returns {Object} Object dengan Authorization header (atau empty)
+ * @example
+ * getAuthHeader() // { Authorization: 'Bearer eyJhbGc...' }
+ */
 const getAuthHeader = () => {
   const token = localStorage.getItem('token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-// Async thunk untuk fetch semua places (public)
+/**
+ * Async Thunk: Fetch All Places
+ * 
+ * Fetch semua places dari database (public endpoint - no auth required).
+ * 
+ * Flow:
+ * 1. GET request ke /places
+ * 2. Backend return array semua places dari database
+ * 3. Frontend update Redux state dengan data
+ * 
+ * Use Cases:
+ * - Homepage untuk tampilkan semua places
+ * - Cards untuk browse semua destinations
+ * 
+ * @async
+ * @returns {Promise<Array>} Array of place objects
+ * @throws {string} Error message jika gagal fetch
+ */
 export const fetchPlaces = createAsyncThunk(
   'places/fetchPlaces',
   async (_, { rejectWithValue }) => {
     try {
+      // Public endpoint - tidak perlu authentication
       const response = await axios.get(`${API_URL}/places`);
       return response.data;
     } catch (error) {
@@ -26,11 +78,30 @@ export const fetchPlaces = createAsyncThunk(
   }
 );
 
-// Async thunk untuk fetch detail place by ID
+/**
+ * Async Thunk: Fetch Place by ID
+ * 
+ * Fetch detail lengkap place berdasarkan ID.
+ * 
+ * Flow:
+ * 1. GET request ke /places/:id
+ * 2. Backend return detail place (name, location, category, images, dll)
+ * 3. Frontend simpan di currentPlace untuk tampilkan di PlaceDetails page
+ * 
+ * Use Cases:
+ * - PlaceDetails page saat user klik "View Details"
+ * - Modal untuk tampilkan detail place
+ * 
+ * @async
+ * @param {number} id - Place ID
+ * @returns {Promise<Object>} Place detail object
+ * @throws {string} Error message jika place not found
+ */
 export const fetchPlaceById = createAsyncThunk(
   'places/fetchPlaceById',
   async (id, { rejectWithValue }) => {
     try {
+      // Public endpoint - tidak perlu authentication
       const response = await axios.get(`${API_URL}/places/${id}`);
       return response.data;
     } catch (error) {
@@ -39,11 +110,33 @@ export const fetchPlaceById = createAsyncThunk(
   }
 );
 
-// Async thunk untuk search places by location (Geoapify)
+/**
+ * Async Thunk: Search Places by Location
+ * 
+ * Search places menggunakan Geoapify Places API berdasarkan query string.
+ * 
+ * Flow:
+ * 1. User ketik query di search bar (contoh: "Bali", "Paris", "Tokyo")
+ * 2. GET request ke /geoapify/search dengan location parameter
+ * 3. Backend forward request ke Geoapify API
+ * 4. Geoapify return list places yang match dengan query
+ * 5. Frontend update searchResults dan tampilkan di SearchResults page
+ * 
+ * Features:
+ * - Real-time search saat user ketik
+ * - Autocomplete untuk suggest locations
+ * - Support untuk city names, addresses, landmarks
+ * 
+ * @async
+ * @param {string} searchQuery - Location query (city, address, landmark)
+ * @returns {Promise<Array>} Array of place objects dari Geoapify
+ * @throws {string} Error message jika search gagal
+ */
 export const searchPlacesByLocation = createAsyncThunk(
   'places/searchByLocation',
   async (searchQuery, { rejectWithValue }) => {
     try {
+      // Requires authentication
       const response = await axios.get(`${API_URL}/geoapify/search`, {
         params: { location: searchQuery },
         headers: getAuthHeader()
@@ -55,11 +148,38 @@ export const searchPlacesByLocation = createAsyncThunk(
   }
 );
 
-// Async thunk untuk fetch nearby places (Geoapify)
+/**
+ * Async Thunk: Fetch Nearby Places
+ * 
+ * Fetch places terdekat berdasarkan koordinat geografis (latitude & longitude).
+ * 
+ * Flow:
+ * 1. User pilih lokasi di map atau allow geolocation
+ * 2. App ambil koordinat (lat, lon)
+ * 3. GET request ke /geoapify/nearby dengan coordinates & radius
+ * 4. Backend forward ke Geoapify Places API
+ * 5. Geoapify return list attractions dalam radius tertentu
+ * 6. Frontend update nearbyPlaces dan tampilkan di map/cards
+ * 7. Save ke localStorage untuk persist last search
+ * 
+ * Use Cases:
+ * - MapSelector untuk tampilkan places terdekat saat select location
+ * - "Near Me" feature untuk tampilkan places di sekitar user
+ * - ChatBot untuk suggest places based on location
+ * 
+ * @async
+ * @param {Object} params - Search parameters
+ * @param {number} params.lat - Latitude koordinat
+ * @param {number} params.lon - Longitude koordinat
+ * @param {number} [params.radius=50000] - Radius pencarian dalam meter (default 50km)
+ * @returns {Promise<Array>} Array of nearby attraction objects
+ * @throws {string} Error message jika fetch gagal
+ */
 export const fetchNearbyPlaces = createAsyncThunk(
   'places/fetchNearby',
   async ({ lat, lon, radius = 50000 }, { rejectWithValue }) => {
     try {
+      // Requires authentication
       const response = await axios.get(`${API_URL}/geoapify/nearby`, {
         params: { lat, lon, radius },
         headers: getAuthHeader()
@@ -72,11 +192,41 @@ export const fetchNearbyPlaces = createAsyncThunk(
   }
 );
 
-// Async thunk untuk get AI recommendation dari Gemini
+/**
+ * Async Thunk: Get AI Recommendation
+ * 
+ * Get personalized AI recommendation untuk place dari Google Gemini AI.
+ * 
+ * Flow:
+ * 1. User buka PlaceDetails page
+ * 2. POST request ke /gemini/recommend dengan placeId
+ * 3. Backend fetch place data dari database
+ * 4. Backend send data ke Google Gemini API dengan prompt
+ * 5. Gemini analyze place data dan generate recommendation
+ * 6. Backend return AI-generated text
+ * 7. Frontend tampilkan recommendation di PlaceDetails
+ * 
+ * Recommendation includes:
+ * - Why user should visit this place
+ * - Best time to visit
+ * - What to expect
+ * - Similar places user might like
+ * 
+ * Use Cases:
+ * - PlaceDetails page untuk provide AI insights
+ * - Enhance user decision making
+ * - Personalized travel suggestions
+ * 
+ * @async
+ * @param {number} placeId - Place ID untuk generate recommendation
+ * @returns {Promise<Object>} AI recommendation object
+ * @throws {string} Error message jika AI call gagal
+ */
 export const getAIRecommendation = createAsyncThunk(
   'places/getAIRecommendation',
   async (placeId, { rejectWithValue }) => {
     try {
+      // Requires authentication
       const response = await axios.post(`${API_URL}/gemini/recommend`, 
         { placeId },
         { headers: getAuthHeader() }
@@ -88,65 +238,140 @@ export const getAIRecommendation = createAsyncThunk(
   }
 );
 
-// Initial state untuk places
+/**
+ * Initial State untuk Places Slice
+ * 
+ * Restore nearbyPlaces & mapCenter dari localStorage jika ada.
+ * Ini memungkinkan user untuk kembali ke last search results setelah refresh.
+ * 
+ * State Properties:
+ * - places: Array semua places dari database (public)
+ * - currentPlace: Object detail place yang sedang dilihat
+ * - searchResults: Array hasil search dari Geoapify
+ * - nearbyPlaces: Array places terdekat (persisted)
+ * - aiRecommendation: String AI-generated recommendation
+ * - mapCenter: {lat, lon} untuk center map (persisted)
+ * - showChatbotResults: Boolean trigger untuk tampilkan hasil chatbot
+ * - filterQuery: String untuk filter places secara local
+ * - isLoading: Boolean loading state
+ * - error: String error message
+ */
 const initialState = {
-  places: [],              // Daftar semua places
-  currentPlace: null,      // Detail place yang sedang dilihat
-  searchResults: [],       // Hasil pencarian
-  nearbyPlaces: JSON.parse(localStorage.getItem('lastSearchResults') || '[]'),  // Places terdekat (persist dari last search)
-  aiRecommendation: null,  // Rekomendasi AI untuk place
-  mapCenter: JSON.parse(localStorage.getItem('lastMapCenter') || 'null'),         // Koordinat center map (persist dari last search)
-  showChatbotResults: false, // Flag untuk trigger tampilan hasil dari chatbot
-  filterQuery: '',         // Global filter query dari Navbar (untuk filter local cards)
+  places: [],
+  currentPlace: null,
+  searchResults: [],
+  nearbyPlaces: JSON.parse(localStorage.getItem('lastSearchResults') || '[]'), // Persist last search
+  aiRecommendation: null,
+  mapCenter: JSON.parse(localStorage.getItem('lastMapCenter') || 'null'), // Persist map position
+  showChatbotResults: false,
+  filterQuery: '',
   isLoading: false,
   error: null,
 };
 
-// Create places slice
+/**
+ * Places Slice
+ * 
+ * Redux slice untuk manage places state & operations.
+ * Includes:
+ * - Sync reducers untuk manual state updates
+ * - Async reducers untuk handle API calls
+ */
 const placesSlice = createSlice({
   name: 'places',
   initialState,
   reducers: {
-    // Action untuk clear error
+    /**
+     * Clear Error
+     * Reset error message ke null.
+     */
     clearError: (state) => {
       state.error = null;
     },
-    // Action untuk clear current place
+    
+    /**
+     * Clear Current Place
+     * Reset currentPlace & aiRecommendation ke null.
+     * Dipanggil saat user navigate away dari PlaceDetails.
+     */
     clearCurrentPlace: (state) => {
       state.currentPlace = null;
       state.aiRecommendation = null;
     },
-    // Action untuk clear search results
+    
+    /**
+     * Clear Search Results
+     * Reset searchResults ke empty array.
+     * Dipanggil saat user clear search atau navigate away.
+     */
     clearSearchResults: (state) => {
       state.searchResults = [];
     },
-    // Action untuk set places dari chatbot dan update map center
+    
+    /**
+     * Set Places from Chatbot
+     * 
+     * Update nearbyPlaces & mapCenter dari hasil chatbot.
+     * Set showChatbotResults flag untuk trigger Home.jsx.
+     * Persist ke localStorage untuk navigation persistence.
+     * 
+     * Flow:
+     * 1. ChatBot get places dari Geoapify
+     * 2. ChatBot dispatch setPlacesFromChatbot dengan places & mapCenter
+     * 3. Reducer update state & localStorage
+     * 4. Home.jsx detect showChatbotResults=true
+     * 5. Home.jsx scroll ke map section
+     * 
+     * @param {Object} action.payload - Chatbot results
+     * @param {Array} action.payload.places - Array of place objects
+     * @param {Object} action.payload.mapCenter - {lat, lon} coordinates
+     */
     setPlacesFromChatbot: (state, action) => {
       const { places, mapCenter } = action.payload;
       state.nearbyPlaces = places || [];
       state.mapCenter = mapCenter || null;
-      state.showChatbotResults = true; // Set flag untuk trigger Home.jsx
+      state.showChatbotResults = true;
       
-      // Persist to localStorage so results remain after navigation
+      // Persist untuk retain results after navigation
       localStorage.setItem('lastSearchResults', JSON.stringify(places || []));
       localStorage.setItem('lastMapCenter', JSON.stringify(mapCenter || null));
     },
-    // Action untuk set map center
+    
+    /**
+     * Set Map Center
+     * Update map center coordinates.
+     * Dipanggil saat user pilih location di MapSelector.
+     */
     setMapCenter: (state, action) => {
       state.mapCenter = action.payload;
     },
-    // Action untuk reset chatbot results flag
+    
+    /**
+     * Reset Chatbot Results
+     * Reset showChatbotResults flag ke false.
+     * Dipanggil setelah Home.jsx selesai scroll ke map.
+     */
     resetChatbotResults: (state) => {
       state.showChatbotResults = false;
     },
-    // Action untuk clear nearby places (clear last search)
+    
+    /**
+     * Clear Nearby Places
+     * Clear nearbyPlaces, mapCenter, dan localStorage.
+     * Dipanggil saat user clear last search.
+     */
     clearNearbyPlaces: (state) => {
       state.nearbyPlaces = [];
       state.mapCenter = null;
       localStorage.removeItem('lastSearchResults');
       localStorage.removeItem('lastMapCenter');
     },
-    // Action untuk set filter query dari Navbar
+    
+    /**
+     * Set Filter Query
+     * Update global filter query dari Navbar.
+     * Digunakan untuk filter places secara local di Home.jsx.
+     */
     setFilterQuery: (state, action) => {
       state.filterQuery = action.payload;
     },

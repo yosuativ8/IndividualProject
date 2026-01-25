@@ -1,46 +1,91 @@
-// authentication middleware untuk memverifikasi token JWT dan mengautentikasi user.
+/**
+ * Authentication Middleware
+ * 
+ * Middleware untuk memverifikasi JWT token dan authenticate user.
+ * Middleware ini akan:
+ * 1. Extract JWT token dari request header
+ * 2. Verify token validity
+ * 3. Lookup user di database
+ * 4. Attach user data ke req.user
+ * 5. Lanjut ke next middleware jika valid
+ * 
+ * Digunakan untuk protect routes yang butuh login (private routes).
+ * 
+ * Usage:
+ * - app.get('/protected', authentication, handler)
+ * - router.use(authentication) // Protect semua routes di router
+ */
 
-const { User } = require('../models');
-const { verifyToken } = require('../helpers/jwt');
+const { User } = require('../models'); // Model User untuk lookup
+const { verifyToken } = require('../helpers/jwt'); // Helper untuk verify JWT
 
+/**
+ * Authentication Middleware Function
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * 
+ * @throws {Unauthorized} Jika token tidak ada atau invalid
+ * @throws {Unauthorized} Jika user tidak ditemukan di database
+ * 
+ * @example
+ * // Protect single route
+ * router.get('/wishlist', authentication, getWishlist);
+ * 
+ * // Protect all routes in router
+ * router.use(authentication);
+ * router.get('/profile', getProfile);
+ * router.put('/profile', updateProfile);
+ */
 module.exports = async function authentication(req, res, next) {
     try {
-        // Mendapatkan token dari header Authorization
+        // Step 1: Mendapatkan token dari header Authorization
+        // Format header: "Authorization: Bearer <token>"
         const authHeader = req.headers.authorization;
 
-        // Jika tidak ada token, lempar error Unauthorized
+        // Jika tidak ada Authorization header, tolak request
         if (!authHeader) {
             throw { name: 'Unauthorized', message: 'Token not provided' };
         }
 
-        // pecahan header untuk mendapatkan tipe dan nilai token
-        const rawToken = authHeader.split(' '); // Bearer <token>
-        const tokenType = rawToken[0]; // Bearer
-        const tokenValue = rawToken[1]; // <token>
+        // Step 2: Parse token dari header
+        // Split "Bearer eyJhbGc..." menjadi ["Bearer", "eyJhbGc..."]
+        const rawToken = authHeader.split(' ');
+        const tokenType = rawToken[0]; // "Bearer"
+        const tokenValue = rawToken[1]; // "eyJhbGc..."
 
-        // cek format token
+        // Validasi format token (harus Bearer token)
         if (tokenType !== 'Bearer' || !tokenValue) {
             throw { name: 'Unauthorized', message: 'Invalid token format' };
         }
 
-        // verifikasi token menggunakan verifyToken dari helpers/jwt
+        // Step 3: Verifikasi token menggunakan JWT helper
+        // Akan throw error jika token invalid atau expired
         const decoded = verifyToken(tokenValue);
 
-        // cek apakah user dengan id dari token ada di database
+        // Step 4: Cek apakah user dengan id dari token masih ada di database
+        // (User bisa saja sudah dihapus tapi tokennya masih valid)
         const user = await User.findByPk(decoded.id);
-        // jika user tidak ditemukan, lempar error Unauthorized
+        
+        // Jika user tidak ditemukan, tolak request
         if (!user) {
             throw { name: 'Unauthorized', message: 'User not found' };
         }
-        // jika semua validasi lolos, simpan data user di req.user dan lanjut ke next middleware
+        
+        // Step 5: Jika semua validasi lolos, attach user data ke req.user
+        // req.user bisa diakses di next middleware atau controller
         req.user = {
             id: user.id,
             email: user.email,
             role: user.role
         };
+        
+        // Lanjut ke next middleware atau controller
         next();
     } catch (error) {
-        // lempar error ke errorHandler middleware.
+        // Jika ada error (token invalid, user not found, dll)
+        // Lempar ke errorHandler middleware
         return next(error);
     }
 }

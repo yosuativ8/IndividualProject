@@ -1,6 +1,14 @@
-// Footer Component - Komponen footer di bagian bawah aplikasi
-// Menampilkan informasi copyright dan links
-
+/**
+ * Footer Component
+ * 
+ * Footer section dengan:
+ * - Brand info
+ * - Quick links (Home, Search, Wishlist)
+ * - Features list (AI, Location, Wishlist, Auth)
+ * - Copyright info
+ * 
+ * @component
+ */
 import React from 'react';
 import { Link } from 'react-router-dom';
 

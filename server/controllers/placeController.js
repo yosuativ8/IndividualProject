@@ -1,20 +1,42 @@
-// placeController untuk mengelola data destinasi wisata publik (READ ONLY)
-// Controller ini hanya untuk mendapatkan data places, tidak ada create/update/delete
-// Create/Update/Delete places dilakukan oleh admin atau seeding data
+/**
+ * PlaceController
+ * 
+ * Controller untuk mengelola data destinasi wisata publik (READ ONLY).
+ * Controller ini hanya untuk mendapatkan data places dari database.
+ * TIDAK ada create/update/delete karena data places dikelola via:
+ * - Seeding data (untuk data initial)
+ * - Admin panel (untuk maintenance)
+ * 
+ * Endpoints:
+ * - GET /places - Get all places dengan filter
+ * - GET /places/:id - Get detail satu place
+ * - GET /places/nearby - Get places dalam radius tertentu
+ * - GET /places/search - Search places by keyword
+ */
 
 // Import models yang dibutuhkan
-const { Place, sequelize } = require('../models');
-const { Op } = require('sequelize'); // Operator untuk query Sequelize
-const axios = require('axios');
+const { Place, sequelize } = require('../models'); // Model Place dan sequelize instance
+const { Op } = require('sequelize'); // Operator untuk advanced query
+const axios = require('axios'); // HTTP client untuk Unsplash API
 
-// Function to fetch real image from Unsplash
+/**
+ * Helper Function: Fetch Place Image dari Unsplash
+ * 
+ * Function untuk mengambil gambar destinasi dari Unsplash API.
+ * Unsplash menyediakan foto berkualitas tinggi dan gratis.
+ * 
+ * @param {string} placeName - Nama destinasi wisata
+ * @param {string} category - Kategori destinasi (Pantai/Gunung/Candi/dll)
+ * @returns {Promise<string|null>} URL gambar dari Unsplash atau null jika gagal
+ */
 async function fetchPlaceImage(placeName, category) {
     try {
-        // Build very specific search query
+        // Build search query yang spesifik untuk Unsplash
         let searchQuery = placeName;
         const lowerName = placeName.toLowerCase();
         
-        // Specific destinations get exact queries
+        // Untuk destinasi terkenal, gunakan nama spesifik + lokasi
+        // Ini menghasilkan gambar yang lebih akurat
         if (lowerName.includes('raja ampat')) {
             searchQuery = 'Raja Ampat Papua Indonesia coral reef island';
         } else if (lowerName.includes('borobudur')) {
@@ -34,12 +56,12 @@ async function fetchPlaceImage(placeName, category) {
         } else if (lowerName.includes('bali') || lowerName.includes('kuta') || lowerName.includes('tanah lot')) {
             searchQuery = placeName + ' Bali Indonesia';
         } else {
-            // Generic search with category context
+            // Generic search: tambahkan \"Indonesia\" jika belum ada
             if (!lowerName.includes('indonesia')) {
                 searchQuery += ' Indonesia';
             }
             
-            // Add category-specific keywords
+            // Tambahkan keyword category untuk context yang lebih baik
             if (category === 'Pantai') {
                 searchQuery += ' beach ocean';
             } else if (category === 'Gunung') {
@@ -53,35 +75,61 @@ async function fetchPlaceImage(placeName, category) {
         
         console.log('Fetching Unsplash image for:', searchQuery);
         
+        // Request ke Unsplash Search API
         const unsplashResponse = await axios.get('https://api.unsplash.com/search/photos', {
             params: {
                 query: searchQuery,
-                per_page: 1,
-                orientation: 'landscape'
+                per_page: 1, // Ambil 1 gambar saja (yang paling relevan)
+                orientation: 'landscape' // Landscape untuk card horizontal
             },
             headers: {
-                'Authorization': `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}`
+                'Authorization': `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}` // API key dari .env
             }
         });
         
+        // Jika ada hasil, return URL gambar regular size
         if (unsplashResponse.data.results && unsplashResponse.data.results.length > 0) {
             const imageUrl = unsplashResponse.data.results[0].urls.regular;
             console.log('✅ Unsplash image found for', placeName, ':', imageUrl);
             return imageUrl;
         }
         
+        // Jika tidak ada hasil
         console.log('⚠️ No Unsplash results for:', searchQuery);
     } catch (error) {
+        // Handle error dari Unsplash API (rate limit, quota, network error)
         console.log('❌ Unsplash API error for', placeName, ':', error.response?.data || error.message);
     }
-    return null;
+    return null; // Return null jika gagal
 }
 
 module.exports = class PlaceController {
-    // Method untuk mendapatkan semua tempat wisata
-    // Endpoint: GET /places
-    // Access: Public (tidak perlu login)
-    // Query params: ?category=Pantai&search=Bali
+    /**
+     * Get All Places
+     * 
+     * Method untuk mendapatkan semua destinasi wisata dari database.
+     * Support filtering by category dan search by keyword.
+     * 
+     * @route GET /places
+     * @access Public (tidak perlu login)
+     * @param {string} [req.query.category] - Filter by category (Pantai/Gunung/Museum/dll)
+     * @param {string} [req.query.search] - Search keyword (name atau location)
+     * 
+     * @returns {Array<Object>} Array of places (200 OK)
+     * 
+     * @example
+     * // Get all places
+     * GET /places
+     * 
+     * // Get only beaches
+     * GET /places?category=Pantai
+     * 
+     * // Search \"bali\"
+     * GET /places?search=bali
+     * 
+     * // Combine filter and search
+     * GET /places?category=Pantai&search=bali
+     */
     static async getAllPlaces(req, res, next) {
         try {
             const { category, search } = req.query;

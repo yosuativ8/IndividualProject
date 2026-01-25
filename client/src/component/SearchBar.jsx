@@ -1,7 +1,16 @@
-// SearchBar Component - Komponen untuk search places
-// Digunakan di Home page dan Search page
-// Search berdasarkan name atau location, bisa langsung ke detail page
-
+/**
+ * SearchBar Component
+ * 
+ * Search form untuk cari places by name atau location.
+ * 
+ * Fitur:
+ * - Search places dari database
+ * - Jika 1 hasil → redirect ke PlaceDetails
+ * - Jika banyak hasil → redirect ke SearchResults page
+ * - Digunakan di Hero section (Home page)
+ * 
+ * @component
+ */
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +24,12 @@ export default function SearchBar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Handle search submit
+  /**
+   * Handle search submit
+   * - GET request ke /places/search
+   * - Jika 1 hasil: navigate ke PlaceDetails
+   * - Jika banyak/tidak ada: navigate ke SearchResults
+   */
   const handleSearch = async (e) => {
     e.preventDefault();
     

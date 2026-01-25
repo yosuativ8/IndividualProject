@@ -1,13 +1,37 @@
-// geminiController untuk mengelola AI features menggunakan Google Gemini API
-// Features: Trip Planner AI, Chatbot Tourism, Personalized Recommendations
+/**
+ * GeminiController
+ * 
+ * Controller untuk mengelola fitur AI menggunakan Google Gemini API.
+ * Google Gemini adalah Large Language Model (LLM) yang digunakan untuk:
+ * - Generate Trip Itinerary (rencana perjalanan wisata)
+ * - Tourism Chatbot (asisten wisata dengan AI)
+ * - Personalized Recommendations (rekomendasi berdasarkan preferensi user)
+ * - Content Generation (generate deskripsi destinasi)
+ * 
+ * Gemini API Key didapat dari: https://makersuite.google.com/app/apikey
+ * Model yang digunakan: gemini-flash-lite-latest (cepat dan murah)
+ */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { UserDestination, Place } = require('../models');
-const { Op } = require('sequelize');
-const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // Library Google Gemini AI
+const { UserDestination, Place } = require('../models'); // Import models
+const { Op } = require('sequelize'); // Sequelize operators untuk query
+const axios = require('axios'); // HTTP client untuk request API eksternal
 
 module.exports = class GeminiController {
-    // Helper method untuk parsing kategori dari pertanyaan
+    /**
+     * Helper Method: Parse Category dari User Query
+     * 
+     * Method ini menganalisis pertanyaan user untuk mendeteksi kategori wisata.
+     * Berguna untuk filtering hasil pencarian berdasarkan jenis destinasi.
+     * 
+     * @param {string} message - Pertanyaan/query dari user
+     * @returns {string} Kategori destinasi (beach/mountain/museum/attraction/natural)
+     * 
+     * @example
+     * parseCategoryFromQuery("pantai di bali") // Returns: "beach"
+     * parseCategoryFromQuery("gunung untuk hiking") // Returns: "mountain"
+     * parseCategoryFromQuery("candi borobudur") // Returns: "attraction"
+     */
     static parseCategoryFromQuery(message) {
         const lowerMessage = message.toLowerCase();
         const categoryMap = {
@@ -26,52 +50,90 @@ module.exports = class GeminiController {
             'waterfall': 'natural'
         };
 
+        // Loop semua keywords dalam categoryMap untuk mencari match
         for (const [keyword, category] of Object.entries(categoryMap)) {
             if (lowerMessage.includes(keyword)) {
-                return category;
+                return category; // Return category jika keyword ditemukan
             }
         }
-        return 'attraction'; // default
+        return 'attraction'; // Default category jika tidak ada match
     }
 
-    // Helper method untuk extract lokasi dari pertanyaan
+    /**
+     * Helper Method: Extract Lokasi dari User Query
+     * 
+     * Method ini menganalisis pertanyaan user untuk extract nama lokasi/tempat.
+     * Mendukung pattern "X di Y" (contoh: "pantai di bali").
+     * 
+     * @param {string} message - Pertanyaan/query dari user
+     * @returns {Object} Object berisi category dan location
+     * @returns {string|null} category - Jenis destinasi (jika ada pattern "X di Y")
+     * @returns {string} location - Nama lokasi/tempat
+     * 
+     * @example
+     * extractLocationFromQuery("pantai di bali")
+     * // Returns: { category: "pantai", location: "bali" }
+     * 
+     * extractLocationFromQuery("jakarta")
+     * // Returns: { category: null, location: "jakarta" }
+     */
     static extractLocationFromQuery(message) {
         // Pattern: "X di Y" atau "Y"
+        // Regex pattern untuk detect "X di Y" (case insensitive)
         const diPattern = /(.+?)\s+di\s+(.+)/i;
         const match = message.match(diPattern);
         
         if (match) {
-            // Ada pattern "X di Y"
+            // Ada pattern "X di Y" → split jadi category dan location
             return {
-                category: match[1].trim(),
-                location: match[2].trim()
+                category: match[1].trim(), // Bagian X (jenis destinasi)
+                location: match[2].trim() // Bagian Y (nama lokasi)
             };
         }
         
-        // Tidak ada pattern, anggap seluruh message adalah lokasi
+        // Tidak ada pattern "di", anggap seluruh message adalah nama lokasi
         return {
-            category: null,
-            location: message.trim()
+            category: null, // Tidak ada info kategori
+            location: message.trim() // Seluruh message adalah lokasi
         };
     }
 
-    // Helper method untuk mendapatkan gambar menggunakan Google Custom Search API
+    /**
+     * Helper Method: Get Image URL untuk Place
+     * 
+     * Method ini mengambil URL gambar destinasi wisata menggunakan Google Custom Search API.
+     * Jika API gagal/quota habis, fallback ke Unsplash Source.
+     * 
+     * Priority order:
+     * 1. Cari dengan nama spesifik destinasi (contoh: "Borobudur Temple")
+     * 2. Cari dengan nama umum destinasi
+     * 3. Fallback ke category-based keywords (contoh: "beach tourism")
+     * 
+     * @param {string} placeName - Nama destinasi wisata
+     * @param {string} category - Kategori destinasi (Beach/Mountain/Museum/dll)
+     * @returns {Promise<string>} URL gambar dari Google Images atau Unsplash
+     * 
+     * @example
+     * await getImageForPlace("Borobudur Temple", "Attraction")
+     * // Returns: "https://...image_url.jpg"
+     */
     static async getImageForPlace(placeName, category) {
         const lowerName = placeName.toLowerCase();
         let searchQuery = '';
         
-        // Priority 1: Use actual place name if it's specific enough
+        // Priority 1: Gunakan nama destinasi spesifik jika cukup jelas
+        // Hindari nama generic seperti "Tempat Wisata"
         if (placeName && placeName.length > 3 && placeName !== 'Tempat Wisata') {
-            // Remove generic words
+            // Hapus kata-kata generic dari nama destinasi
             const cleanName = placeName.replace(/tempat wisata|destinasi|wisata/gi, '').trim();
             
-            // Check if it's a specific place name
+            // Cek apakah nama bersih masih cukup spesifik
             if (cleanName.length > 3) {
                 searchQuery = `${cleanName} tourist destination`;
             }
         }
         
-        // Priority 2: Use specific destination keywords if match
+        // Priority 2: Gunakan nama destinasi apa adanya jika tidak match Priority 1
         if (!searchQuery) {
             // Just use the place name as is for better worldwide results
             if (placeName.length > 5) {

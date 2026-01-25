@@ -1,3 +1,27 @@
+/**
+ * Place Details Page Component
+ * 
+ * Halaman detail destinasi wisata dengan fitur:
+ * - Display full place information (image, name, description, location, rating)
+ * - Toggle wishlist (add/remove from saved places)
+ * - AI Recommendation dari Google Gemini (personalized suggestions)
+ * - Integration dengan Google Maps (coordinates display)
+ * - Responsive layout dengan Bootstrap cards
+ * 
+ * Features:
+ * - Lazy load place details by ID (from URL params)
+ * - Check wishlist status (heart icon filled/outline)
+ * - Request AI recommendations (butuh login)
+ * - Error handling & retry mechanism
+ * - Loading states untuk UX yang baik
+ * 
+ * Access: Public (semua bisa lihat, tapi wishlist & AI butuh login)
+ * 
+ * @component
+ * @example
+ * <Route path="/places/:id" element={<PlaceDetails />} />
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -5,20 +29,26 @@ import { fetchPlaceById, getAIRecommendation, clearCurrentPlace } from '../store
 import { addToWishlist, removeFromWishlist } from '../store/slices/wishlistSlice';
 
 export default function PlaceDetails() {
+  // Get place ID from URL params (/places/:id)
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
+  // Redux state
   const { currentPlace, aiRecommendation, isLoading, error } = useSelector((state) => state.places);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const { items: wishlistItems } = useSelector((state) => state.wishlist);
   
-  // State untuk toggle tampilan AI recommendation
+  // Local state untuk toggle AI recommendation section
   const [showAIRecommendation, setShowAIRecommendation] = useState(false);
 
   /**
-   * useEffect untuk fetch detail place saat component mount
-   * Cleanup: clear currentPlace saat component unmount
+   * Effect: Fetch Place Details on Mount
+   * 
+   * - Fetch place data by ID saat component mount
+   * - Cleanup: clear currentPlace saat component unmount (prevent memory leak)
+   * 
+   * Dependencies: dispatch, id (URL param)
    */
   useEffect(() => {
     dispatch(fetchPlaceById(id));

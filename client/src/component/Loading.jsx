@@ -1,6 +1,14 @@
-// Loading Component - Komponen untuk menampilkan loading state
-// Digunakan saat data sedang di-fetch dari API
-
+/**
+ * Loading Component
+ * 
+ * Menampilkan loading spinner dengan custom message.
+ * Digunakan saat fetch data dari API.
+ * 
+ * Props:
+ * @param {string} message - Loading message (default: 'Loading...')
+ * 
+ * @component
+ */
 import React from 'react';
 
 export default function Loading({ message = 'Loading...' }) {
